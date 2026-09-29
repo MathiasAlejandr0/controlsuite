@@ -38,7 +38,15 @@ export async function listCloudflareZones(token: string) {
 
 export async function validateCloudflareToken(token: string) {
   const verify = await fetchJson('https://api.cloudflare.com/client/v4/user/tokens/verify', { headers: auth(token) })
-  if (!verify.ok) return { ok: false as const, error: `Cloudflare rechazó el token (${verify.status}).` }
+  if (!verify.ok) {
+    return {
+      ok: false as const,
+      error:
+        verify.status === 401 || verify.status === 403
+          ? 'Cloudflare no aceptó el token. Creá uno con Zone:Read, SSL:Read, Zone Settings:Read y Analytics:Read.'
+          : `Cloudflare respondió ${verify.status}. Esperá un momento y probá otra vez.`,
+    }
+  }
   const resources = await listCloudflareZones(token)
   const result = asRecord(asRecord(verify.body)?.result)
   const account = typeof result?.status === 'string' ? `token ${result.status}` : 'token activo'

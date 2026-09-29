@@ -7,7 +7,7 @@ import { WorkspaceProvider } from '@/lib/workspace'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Suite Control 1.1',
+  title: 'Suite Control',
   description: 'Centro de mando para la salud, el acceso y la remediación de tus proyectos.',
 }
 

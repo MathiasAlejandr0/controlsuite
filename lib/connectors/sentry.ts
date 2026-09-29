@@ -65,7 +65,10 @@ export async function validateSentryToken(token: string) {
     signal: AbortSignal.timeout(12_000),
   })
   if (response.status === 401 || response.status === 403) {
-    return { ok: false as const, error: 'Sentry rechazó el token. Hace falta project:read y event:read.' }
+    return {
+      ok: false as const,
+      error: 'Sentry no aceptó el token. Al crearlo marcá project:read, event:read y org:read.',
+    }
   }
   if (!response.ok) return { ok: false as const, error: `Sentry respondió ${response.status}.` }
   const resources = await listSentryProjects(token)

@@ -1881,3 +1881,170 @@ a.primary-button {
     animation: none;
   }
 }
+
+.page-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+
+.page-stack > .page-heading {
+  margin-bottom: 0;
+}
+
+.status-dot.dot-healthy,
+.status-dot.dot-degraded,
+.status-dot.dot-down,
+.status-dot.dot-unknown {
+  width: 10px;
+  height: 10px;
+  box-shadow: none;
+  flex: 0 0 10px;
+}
+
+.dot-healthy {
+  background: #3dd68c;
+}
+
+.dot-degraded {
+  background: #f5b94c;
+}
+
+.dot-down {
+  background: #ff716d;
+}
+
+.dot-unknown {
+  background: #6b7c8a;
+}
+
+.quiet-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.quiet-row-link {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.quiet-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.quiet-copy strong {
+  font-size: 15px;
+  letter-spacing: -0.02em;
+}
+
+.quiet-copy span,
+.quiet-empty {
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.quiet-empty {
+  margin: 0;
+}
+
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.section-head h2,
+.page-stack h2 {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: -0.03em;
+}
+
+.section-head p {
+  margin: 4px 0 0;
+  color: var(--muted-foreground);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.steps {
+  margin: 0 0 16px;
+  padding-left: 18px;
+  color: #d5dee6;
+}
+
+.steps li + li {
+  margin-top: 6px;
+}
+
+.quiet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.text-button {
+  background: none;
+  border: 0;
+  color: var(--muted-foreground);
+  padding: 6px 0;
+  font-weight: 650;
+}
+
+.text-button:hover {
+  color: var(--foreground);
+}
+
+details.fold {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  padding: 16px 18px;
+}
+
+details.fold > summary,
+details.inline-fold > summary {
+  cursor: pointer;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+details.fold > summary + * {
+  margin-top: 16px;
+}
+
+.alert-card {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.alert-card .inline-fold {
+  flex: 1 0 100%;
+  margin-top: 8px;
+}
+
+.page-heading h1 .status-dot {
+  margin-right: 10px;
+  vertical-align: 2px;
+}

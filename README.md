@@ -39,17 +39,14 @@ La primera vez la suite pide un PIN. Sin PIN no abre el catálogo. El middleware
 
 ## Conectar un servicio
 
-Entrá a un proyecto. Cada servicio (GitHub, Vercel, Supabase, Cloudflare, Sentry) tiene una tarjeta con **Conectar**, **Probar** y **Desconectar**.
+La cuenta se guarda **una vez** en Cuentas. En cada proyecto solo confirmás el recurso.
 
-1. **Conectar** abre el diálogo. El enlace lleva a la página de tokens del proveedor y lista los permisos mínimos.
-2. Pegás el token. **Validar** lo prueba contra la API. Si falla, no se guarda.
-3. Elegís el recurso de ese proyecto: proyecto de Vercel, ref de Supabase, zona de Cloudflare, `org/proyecto` de Sentry o `owner/repo` de GitHub.
-4. **Guardar enlace** cifra el token en la bóveda y corre el chequeo.
-5. El estado de la tarjeta es **Conectado**, **Error** o **Sin conectar**, con la hora del último chequeo.
+1. Abrí el proyecto. **Conectar todo** recorre los servicios que el repo ya usa (dependencias, `.env.example`, `vercel.json`, `supabase/`, `wrangler`, remote de git, Sentry).
+2. Si falta la cuenta, un diálogo de tres pasos abre la página del proveedor, muestra los permisos y valida el token al pegarlo. El mensaje dice qué permiso falta. GitHub también puede usar la GitHub App.
+3. Si hay un solo recurso, o uno que coincide con lo detectado, se elige solo. Si hay varios, confirmás cuál es.
+4. El estado es **Conectado**, **Falta conectar** o **Error**, con qué hacer.
 
-GitHub también puede usar la GitHub App (el mismo flujo de manifiesto que ya tenía la suite), en lugar de un PAT.
-
-**Olvidar token** borra el token de la bóveda. **Desconectar** solo suelta el recurso de ese proyecto.
+**Quitar** en Cuentas borra el token de la bóveda. El recurso de un proyecto se puede cambiar confirmando otro.
 
 ### Permisos mínimos
 
@@ -74,7 +71,7 @@ La misma alerta no se duplica: la clave es proyecto + check. Se guardan la prime
 
 Cada alerta trae **Qué hacer**, en español: por ejemplo activar Under Attack y un rate limit, la policy RLS que falta, o el log del deploy.
 
-Aparecen en Inicio, en Incidentes y, si son de exposición, en Seguridad.
+El inicio muestra solo las abiertas. El detalle y qué hacer están en Alertas.
 
 ## Datos locales
 

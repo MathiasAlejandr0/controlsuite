@@ -7,6 +7,7 @@ import {
   normalizeVercelProject,
 } from './connection-ids'
 import { parseSentrySlug } from './connectors/sentry'
+import { cloudflareZoneFromText, githubFromGitConfig, publicZone, supabaseRefFromText } from './detect-resources'
 import { linkTarget } from './link-target'
 import type { DetectedNeed, ProjectDraft, ProjectKind, StackNeed } from './types'
 
@@ -61,12 +62,9 @@ function envValue(text: string, key: string) {
   return match?.[1]?.trim()
 }
 
-function supabaseRefFromText(text: string) {
-  const url =
-    envValue(text, 'NEXT_PUBLIC_SUPABASE_URL') ??
-    envValue(text, 'SUPABASE_URL') ??
-    text.match(/https:\/\/([a-z0-9]{15,})\.supabase\.co/i)?.[0]
-  return normalizeSupabaseRef(url)
+function readSupabaseRef(envText: string, dir: string) {
+  const toml = hasFile(dir, 'supabase/config.toml') ? readCapped(join(dir, 'supabase/config.toml'), 20_000) : ''
+  return supabaseRefFromText(envText, toml)
 }
 
 function databaseHint(text: string): 'supabase' | 'insforge' | 'neon' | 'postgres' | undefined {
@@ -130,7 +128,10 @@ export function detectStack(dir: string, kind?: ProjectKind): StackReport {
     : ''
   const present = KNOWN_RELATIVE.filter((rel) => hasFile(dir, rel))
 
-  const supabaseRef = supabaseRefFromText(envText)
+  const supabaseRef = readSupabaseRef(envText, dir)
+  const gitConfig = hasFile(dir, '.git/config') ? readCapped(join(dir, '.git/config'), 8_000) : ''
+  const githubRepo = githubFromGitConfig(gitConfig)
+  const wranglerText = wrangler ? readCapped(join(dir, wrangler), 20_000) : ''
   const dbHint = databaseHint(envText)
   const vercelFromFile = (() => {
     try {
@@ -151,11 +152,13 @@ export function detectStack(dir: string, kind?: ProjectKind): StackReport {
   const usesPrisma = hasFile(dir, 'prisma/schema.prisma') || deps.has('@prisma/client') || deps.has('prisma')
   const usesPostgres = usesPrisma || dbHint === 'postgres' || dbHint === 'neon' || /provider\s*=\s*"postgresql"/i.test(prisma)
   const homepage = pkg?.homepage ?? ''
+  const zone = cloudflareZoneFromText(wranglerText, homepage || undefined) || publicZone(homepage)
   const vercelFromEnv = Boolean(envValue(envText, 'VERCEL_PROJECT_ID') || envValue(envText, 'VERCEL_PROJECT_NAME'))
   const vercelFromUrl = /\.vercel\.app\b/i.test(homepage)
   const usesVercel = Boolean(vercelFromFile) || vercelFromEnv || vercelFromUrl || kind === 'web'
   const usesCloudflare =
     Boolean(wrangler) ||
+    Boolean(zone) ||
     deps.has('wrangler') ||
     deps.has('@cloudflare/workers-types')
   const usesSentry =
@@ -312,7 +315,9 @@ export function detectStack(dir: string, kind?: ProjectKind): StackReport {
     draft: {
       supabaseRef,
       insforgeProject,
-      vercelProject: normalizeVercelProject(vercelFromFile),
+      githubRepo,
+      cloudflareZone: zone,
+      vercelProject: normalizeVercelProject(vercelFromFile || envValue(envText, 'VERCEL_PROJECT_NAME')),
       sentryProject: parseSentrySlug(sentrySlug),
       hasDocker: usesDocker,
       needs: needs.map((need) => need.provider as DetectedNeed),

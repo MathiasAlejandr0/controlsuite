@@ -6,7 +6,6 @@ import { useEffect, useRef, useState } from 'react'
 import {
   Activity,
   AlertTriangle,
-  Bell,
   Box,
   Check,
   LayoutDashboard,
@@ -14,7 +13,6 @@ import {
   MoreHorizontal,
   Search,
   Settings,
-  ShieldCheck,
   X,
   Zap,
 } from 'lucide-react'
@@ -26,9 +24,8 @@ import { SecretReveal } from './secret-reveal'
 const NAV = [
   { href: '/', label: 'Inicio', icon: LayoutDashboard },
   { href: '/projects', label: 'Proyectos', icon: Box },
-  { href: '/incidents', label: 'Incidentes', icon: AlertTriangle, alert: true },
-  { href: '/security', label: 'Seguridad', icon: ShieldCheck },
-  { href: '/integrations', label: 'Entorno', icon: Zap },
+  { href: '/incidents', label: 'Alertas', icon: AlertTriangle, alert: true },
+  { href: '/integrations', label: 'Cuentas', icon: Zap },
 ]
 
 function isActive(pathname: string, href: string) {
@@ -39,9 +36,8 @@ function isActive(pathname: string, href: string) {
 function pageTitle(pathname: string) {
   if (pathname.startsWith('/projects/')) return 'Proyecto'
   if (pathname.startsWith('/projects')) return 'Proyectos'
-  if (pathname.startsWith('/incidents')) return 'Incidentes'
-  if (pathname.startsWith('/security')) return 'Seguridad'
-  if (pathname.startsWith('/integrations')) return 'Entorno'
+  if (pathname.startsWith('/incidents')) return 'Alertas'
+  if (pathname.startsWith('/integrations')) return 'Cuentas'
   if (pathname.startsWith('/settings')) return 'Ajustes'
   return 'Inicio'
 }
@@ -88,14 +84,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <X size={18} />
           </button>
         </div>
-
-        <Link href="/settings" className="workspace-switch">
-          <span className="workspace-avatar">{profile.initials}</span>
-          <span className="workspace-copy">
-            <strong>{profile.name}</strong>
-            <small>{profile.label}</small>
-          </span>
-        </Link>
 
         <nav className="nav-group" aria-label="Principal">
           <p className="nav-label">Workspace</p>
@@ -171,14 +159,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               />
               <kbd>Ctrl K</kbd>
             </label>
-            <Link
-              href="/incidents"
-              className="icon-button notification-button"
-              aria-label={incidentCount > 0 ? `${incidentCount} incidentes abiertos` : 'Incidentes'}
-            >
-              <Bell size={18} />
-              {incidentCount > 0 && <span />}
-            </Link>
           </div>
         </header>
 

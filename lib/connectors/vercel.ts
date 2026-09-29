@@ -106,7 +106,15 @@ export async function listVercelProjects(token: string, teamId?: string) {
 
 export async function validateVercelToken(token: string) {
   const user = await fetchJson('https://api.vercel.com/v2/user', { headers: auth(token) })
-  if (!user.ok) return { ok: false as const, error: `Vercel rechazó el token (${user.status}).` }
+  if (!user.ok) {
+    return {
+      ok: false as const,
+      error:
+        user.status === 401 || user.status === 403
+          ? 'Vercel no aceptó el token. Creá uno nuevo en Account → Tokens, con permiso para ver proyectos.'
+          : `Vercel respondió ${user.status}. Esperá un momento y probá otra vez.`,
+    }
+  }
   const account = asRecord(asRecord(user.body)?.user)
   const label =
     (typeof account?.username === 'string' && account.username) ||

@@ -174,7 +174,9 @@ export function actionsHealthCheck(repo: string, run?: GithubRun, reachableWitho
 
 export async function fetchGithubUser(token: string): Promise<GithubUser> {
   const response = await fetch('https://api.github.com/user', { headers: headers(token), cache: 'no-store' })
-  if (response.status === 401) throw new Error('El PAT de GitHub no es válido.')
+  if (response.status === 401) {
+    throw new Error('GitHub no aceptó el token. Creá uno con repo, security_events y read:org.')
+  }
   if (!response.ok) throw new Error(`GitHub ${response.status} al leer la cuenta.`)
   const raw = (await response.json()) as { login: string; name?: string | null; avatar_url?: string; html_url: string }
   return {

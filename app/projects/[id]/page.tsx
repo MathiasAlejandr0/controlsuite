@@ -1,27 +1,15 @@
 'use client'
 
 import Link from 'next/link'
-import { use, useMemo, useState } from 'react'
-import {
-  ExternalLink,
-  FolderGit2,
-  LockKeyhole,
-  RefreshCw,
-  Sparkles,
-  TriangleAlert,
-} from 'lucide-react'
+import { use, useState } from 'react'
 import { CursorModal } from '@/components/cursor-modal'
+import { ConnectPanel } from '@/components/connect-panel'
 import { ProjectAccess } from '@/components/project-access'
-import { IncidentCard } from '@/components/incident-card'
 import { ProjectConnections } from '@/components/project-connections'
-import { ServiceConnect } from '@/components/service-connect'
-import { ProjectLinkPanel } from '@/components/project-link-panel'
 import { ProjectOps } from '@/components/project-ops'
-import { ProjectIcon } from '@/components/project-icon'
 import { StatusPill } from '@/components/status-pill'
-import { kindLabel, projectChecks, projectCoverage, projectScore, projectStatus, serviceStatus, statusLabel } from '@/lib/health'
+import { projectChecks, projectStatus } from '@/lib/health'
 import { composeRemediationPrompt } from '@/lib/prompt-engineer'
-import { serviceMeta, uptimeLabel } from '@/lib/labels'
 import { safeHttpUrl } from '@/lib/safe-url'
 import { useWorkspace } from '@/lib/workspace'
 
@@ -31,333 +19,149 @@ export default function ProjectDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = use(params)
-  const { openReveal, projects, incidents: allIncidents, refresh, refreshing, ready, deleteProject, resolveIncident, openCursor } =
-    useWorkspace()
+  const { projects, incidents, refresh, refreshing, ready, deleteProject, openCursor, saveIntegrations } = useWorkspace()
   const project = projects.find((item) => item.id === id)
   const [cursorOpen, setCursorOpen] = useState(false)
-  const [cursorIncidentId, setCursorIncidentId] = useState<string>()
+  const [secretDrafts, setSecretDrafts] = useState<Record<string, string>>({})
 
-  const score = project ? projectScore(project) : 0
-  const status = project ? projectStatus(project) : 'unknown'
-  const coverage = project ? projectCoverage(project) : { measured: 0, total: 0 }
-  const checks = project ? projectChecks(project) : []
-  const incidents = project ? allIncidents.filter((item) => item.projectId === project.id) : []
-  const secrets = useMemo(
-    () =>
-      project
-        ? project.services.flatMap((service) =>
-            service.secretRefs.map((secret) => ({ service, secret })),
-          )
-        : [],
-    [project],
-  )
-
-  if (!ready) {
-    return (
-      <div className="skeleton-stack" aria-hidden="true">
-        <div className="skeleton skeleton-title" />
-        <div className="skeleton" />
-        <div className="skeleton" />
-      </div>
-    )
-  }
+  if (!ready) return <p className="quiet-empty">Cargando…</p>
 
   if (!project) {
     return (
-      <div className="empty-state">
-        Proyecto no encontrado. <Link href="/projects">Volver al catálogo</Link>
-      </div>
+      <p className="quiet-empty">
+        Proyecto no encontrado. <Link href="/projects">Volver</Link>
+      </p>
     )
   }
 
-  const brief = composeRemediationPrompt({
-    project,
-    incidents,
-    incidentId: cursorIncidentId,
-  })
+  const status = projectStatus(project)
+  const checks = projectChecks(project)
+  const open = incidents.filter((item) => item.projectId === project.id && item.status === 'open')
+  const secrets = project.services.flatMap((service) =>
+    service.secretRefs.map((secret) => ({ service, secret })),
+  )
+  const brief = composeRemediationPrompt({ project, incidents, incidentId: open[0]?.id })
+  const site = safeHttpUrl(project.productionUrl)
 
   return (
-    <>
-      <section className="detail-heading">
+    <div className="page-stack">
+      <section className="page-heading">
         <div>
-          <div className="eyebrow">
-            <span className="live-dot" />
-            {kindLabel(project.kind)} · {project.branch}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <ProjectIcon kind={project.kind} />
-            <h1>
-              {project.name}
-              <span className="heading-period">.</span>
-            </h1>
-          </div>
-          <p>{project.summary}</p>
-          <div className="detail-meta">
-            <StatusPill status={status} />
-            <span>
-              Score <strong>{score}</strong>/100
-              {coverage.measured < coverage.total
-                ? ` · ${coverage.measured}/${coverage.total} medidos`
-                : ''}
-            </span>
-            <span>Uptime {uptimeLabel(project.uptime)}</span>
-            {safeHttpUrl(project.productionUrl) && (
-              <a href={safeHttpUrl(project.productionUrl)} target="_blank" rel="noreferrer">
-                {project.productionUrl!.replace(/^https?:\/\//, '')}
-              </a>
+          <h1>
+            <span className={`status-dot dot-${status}`} /> {project.name}
+          </h1>
+          <p>
+            {open.length > 0 ? (
+              <Link href="/incidents">
+                {open.length === 1 ? '1 alerta abierta' : `${open.length} alertas abiertas`}
+              </Link>
+            ) : (
+              'Sin alertas abiertas.'
             )}
-            <code>{project.localPath}</code>
-          </div>
-        </div>
-        <div className="heading-actions">
-          <button
-            type="button"
-            className="ghost-button"
-            disabled={refreshing}
-            onClick={() => void refresh(project.id)}
-          >
-            <RefreshCw size={16} />
-            {refreshing ? 'Chequeando…' : 'Chequear ahora'}
-          </button>
-          <button
-            type="button"
-            className="primary-button"
-            onClick={() => {
-              setCursorIncidentId(undefined)
-              setCursorOpen(true)
-            }}
-          >
-            <Sparkles size={16} />
-            Abrir en Cursor
-          </button>
-          <button
-            type="button"
-            className="ghost-button"
-            onClick={() => {
-              if (window.confirm(`¿Borrar ${project.name} del catálogo?`)) {
-                void deleteProject(project.id).then(() => {
-                  window.location.href = '/projects'
-                })
-              }
-            }}
-          >
-            Borrar
-          </button>
+            {site ? ` · ${site.replace(/^https?:\/\//, '')}` : ''}
+          </p>
         </div>
       </section>
 
-      <section className="metric-grid" aria-label="Salud del proyecto">
-        <div className={`metric-card ${status === 'down' ? 'metric-risk' : 'metric-featured'}`}>
-          <div className="metric-top">
-            <span>Salud de producción</span>
-            <FolderGit2 size={16} />
-          </div>
-          <div className="metric-value">
-            {score}
-            <span className="metric-unit">/100</span>
-          </div>
-          <div className="metric-footer">
-            <span className={status === 'healthy' ? 'trend-up' : 'trend-warn'}>
-              {statusLabel(status)}
-            </span>
-            <span>{checks.filter((check) => check.status !== 'healthy').length} checks en riesgo</span>
-          </div>
-        </div>
-        <div className="metric-card">
-          <div className="metric-top">
-            <span>Servicios</span>
-          </div>
-          <div className="metric-value">{String(project.services.length).padStart(2, '0')}</div>
-          <div className="metric-footer">
-            <span>
-              {project.services.filter((service) => service.accessOnly).length} solo acceso
-            </span>
-          </div>
-        </div>
-        <div className="metric-card">
-          <div className="metric-top">
-            <span>Secretos referenciados</span>
-            <LockKeyhole size={16} />
-          </div>
-          <div className="metric-value">{String(secrets.length).padStart(2, '0')}</div>
-          <div className="metric-footer">
-            <span>Revelar pide el valor real al servidor</span>
-          </div>
-        </div>
-        <div className="metric-card metric-risk">
-          <div className="metric-top">
-            <span>Incidentes</span>
-            <TriangleAlert size={16} />
-          </div>
-          <div className="metric-value">{String(incidents.length).padStart(2, '0')}</div>
-          <div className="metric-footer">
-            <span className="trend-warn">{incidents[0]?.title ?? 'Sin abiertos'}</span>
-          </div>
-        </div>
-      </section>
+      <ConnectPanel project={project} />
 
-      <ProjectAccess project={project} />
-
-      <ProjectOps project={project} />
-
-      <ServiceConnect project={project} />
-
-      <ProjectLinkPanel projectId={project.id} />
-
-      <ProjectConnections project={project} />
-
-      <section className="section-block">
-        <h2>Servicios involucrados</h2>
-        <div className="service-grid">
-          {project.services.map((service) => {
-            const meta = serviceMeta[service.kind]
-            const current = serviceStatus(service)
-            return (
-              <article key={service.id} className="service-card">
-                <header>
-                  <div>
-                    <h3>{service.name}</h3>
-                    <p>{service.role}</p>
-                  </div>
-                  <StatusPill status={current} />
-                </header>
-                <div className="service-list">
-                  {service.accessOnly && <span>Solo acceso</span>}
-                  {service.externalId && <span>{service.externalId}</span>}
-                  <span className={`chip icon-${meta.tone}`}>{meta.label}</span>
-                </div>
-                {service.checks[0] && <p>{service.checks[0].detail}</p>}
-                <div className="service-actions">
-                  {service.secretRefs[0] && (
-                    <button
-                      type="button"
-                      className="ghost-button"
-                      onClick={() =>
-                        void openReveal({
-                          secret: service.secretRefs[0],
-                          projectName: project.name,
-                          serviceName: service.name,
-                          projectId: project.id,
-                          serviceId: service.id,
-                        })
-                      }
-                    >
-                      <LockKeyhole size={14} />
-                      Revelar acceso
-                    </button>
-                  )}
-                  {safeHttpUrl(service.dashboardUrl) && (
-                    <a
-                      className="ghost-button"
-                      href={safeHttpUrl(service.dashboardUrl)}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <ExternalLink size={14} />
-                      Dashboard
-                    </a>
-                  )}
-                </div>
-              </article>
-            )
-          })}
-        </div>
-      </section>
-
-      <div className="content-grid">
-        <section className="section-block">
-          <h2>Checks de salud</h2>
-          <div className="check-list">
-            {checks.map((check) => (
-              <div key={check.id} className="check-row">
-                <div>
-                  <strong>{check.label}</strong>
-                  <p>
-                    {check.detail} · {check.source}
-                  </p>
-                </div>
-                <div style={{ textAlign: 'right' }}>
+      <details className="fold">
+        <summary>Ver detalles</summary>
+        <div className="stack">
+          <p className="quiet-copy">
+            <span>{project.localPath}</span>
+            {project.summary ? <span>{project.summary}</span> : null}
+          </p>
+          <div className="quiet-actions">
+            <button type="button" className="ghost-button" disabled={refreshing} onClick={() => void refresh(project.id)}>
+              {refreshing ? 'Chequeando…' : 'Chequear ahora'}
+            </button>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => {
+                setCursorOpen(true)
+                void openCursor(project.id, open[0]?.id)
+              }}
+            >
+              Abrir en Cursor
+            </button>
+            <button
+              type="button"
+              className="text-button"
+              onClick={() => {
+                if (window.confirm(`¿Sacar “${project.name}” del catálogo?`)) {
+                  void deleteProject(project.id).then(() => {
+                    window.location.href = '/projects'
+                  })
+                }
+              }}
+            >
+              Quitar del catálogo
+            </button>
+          </div>
+          {checks.length > 0 && (
+            <div className="stack">
+              {checks.map((check) => (
+                <div key={check.id} className="quiet-row">
                   <StatusPill status={check.status} />
-                  <div className="check-weight">peso {check.weight}</div>
+                  <div className="quiet-copy">
+                    <strong>{check.label}</strong>
+                    <span>{check.detail}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="section-block">
-          <h2>Tokens de API</h2>
-          <p className="modal-sub">PAT y tokens. Las contraseñas de cuenta están arriba, en Accesos.</p>
-          <div className="secret-list">
-            {secrets
-              .filter(({ secret }) => secret.field !== 'password' && !secret.id.endsWith('-login'))
-              .map(({ service, secret }) => (
-              <div key={secret.id} className="secret-row">
-                <div>
-                  <strong>
-                    {service.name} · {secret.label}
-                  </strong>
-                  <p>{secret.loginUrl ?? 'sin URL de login'}</p>
-                </div>
-                <button
-                  type="button"
-                  className="ghost-button"
-                  onClick={() =>
-                    void openReveal({
-                      secret,
-                      projectName: project.name,
-                      serviceName: service.name,
-                      projectId: project.id,
-                      serviceId: service.id,
-                    })
-                  }
-                >
-                  Revelar
-                </button>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
-
-      {incidents.length > 0 && (
-        <section className="section-block">
-          <h2>Incidentes de este proyecto</h2>
-          <div className="incident-stack">
-            {incidents.map((incident) => (
-              <IncidentCard
-                key={incident.id}
-                incident={incident}
-                onAcknowledge={
-                  incident.status === 'open'
-                    ? () => void resolveIncident(incident.id, 'acknowledged')
-                    : undefined
-                }
-                onResolve={
-                  incident.status !== 'resolved' ? () => void resolveIncident(incident.id, 'resolved') : undefined
-                }
-                onCursor={() => {
-                  setCursorIncidentId(incident.id)
-                  setCursorOpen(true)
-                  void openCursor(project.id, incident.id)
+              ))}
+            </div>
+          )}
+          <ProjectAccess project={project} />
+          <ProjectOps project={project} />
+          <ProjectConnections project={project} />
+          {secrets.length > 0 && (
+            <div className="stack">
+              {secrets.map(({ service, secret }) => (
+                <label key={secret.id} className="quiet-row">
+                  <span className="quiet-copy">
+                    <strong>
+                      {service.name} · {secret.label}
+                    </strong>
+                  </span>
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    placeholder="Pegar valor"
+                    value={secretDrafts[secret.id] ?? ''}
+                    onChange={(event) =>
+                      setSecretDrafts((current) => ({ ...current, [secret.id]: event.target.value }))
+                    }
+                  />
+                </label>
+              ))}
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => {
+                  const filled = Object.fromEntries(
+                    Object.entries(secretDrafts).filter(([, value]) => value.trim()),
+                  )
+                  void saveIntegrations({ secrets: filled })
+                  setSecretDrafts({})
                 }}
-              />
-            ))}
-          </div>
-        </section>
-      )}
+              >
+                Guardar accesos
+              </button>
+            </div>
+          )}
+        </div>
+      </details>
 
       <CursorModal
         open={cursorOpen}
-        onClose={() => {
-          setCursorOpen(false)
-          setCursorIncidentId(undefined)
-        }}
+        onClose={() => setCursorOpen(false)}
         projectId={project.id}
         projectName={project.name}
-        incidentId={cursorIncidentId}
+        incidentId={open[0]?.id}
         brief={brief}
       />
-    </>
+    </div>
   )
 }

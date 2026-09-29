@@ -118,7 +118,15 @@ export async function listSupabaseProjects(token: string) {
 
 export async function validateSupabaseToken(token: string) {
   const response = await fetchJson('https://api.supabase.com/v1/projects', { headers: auth(token) })
-  if (!response.ok) return { ok: false as const, error: `Supabase rechazó el token (${response.status}).` }
+  if (!response.ok) {
+    return {
+      ok: false as const,
+      error:
+        response.status === 401 || response.status === 403
+          ? 'Supabase no aceptó el token. Tiene que ser un access token de Account → Access Tokens.'
+          : `Supabase respondió ${response.status}. Esperá un momento y probá otra vez.`,
+    }
+  }
   const resources = await listSupabaseProjects(token)
   return { ok: true as const, account: 'Management API', resources }
 }
