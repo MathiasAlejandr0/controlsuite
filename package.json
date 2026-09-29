@@ -1,0 +1,35 @@
+{
+  "name": "suite-control",
+  "version": "1.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1 --port 3100",
+    "build": "next build",
+    "start": "next start --hostname 127.0.0.1 --port 3100",
+    "suite": "next start --hostname 127.0.0.1 --port 3100",
+    "test": "vitest run",
+    "watchdog": "node scripts/watchdog.mjs",
+    "pack": "node scripts/pack-installer.mjs"
+  },
+  "dependencies": {
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "geist": "^1.5.1",
+    "lucide-react": "^0.544.0",
+    "next": "^15.5.4",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "tailwind-merge": "^3.3.1",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.13",
+    "@types/node": "^22.18.6",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.13",
+    "typescript": "5.7.3",
+    "vitest": "^3.2.4"
+  }
+}
