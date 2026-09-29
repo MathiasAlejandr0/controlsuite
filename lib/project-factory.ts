@@ -198,7 +198,9 @@ export function createProjectFromDraft(draft: ProjectDraft, existingIds: Iterabl
         role: 'Errores de producción',
         status: 'unknown',
         externalId: sentryProject,
-        dashboardUrl: `https://sentry.io/organizations/${sentryProject.split('/')[0]}/`,
+        dashboardUrl: sentryProject
+          ? `https://sentry.io/organizations/${sentryProject.split('/')[0]}/`
+          : 'https://sentry.io',
         secretRefs: [accountLogin(`${id}-sentry`, 'https://sentry.io/auth/login/')],
         checks: [],
       }),
@@ -240,7 +242,7 @@ export function dropCloudServicesNotInNeeds(project: Project, needs: DetectedNee
     ...project,
     services: project.services.filter((service) => {
       if (!DROPPABLE.has(service.kind)) return true
-      return wanted.has(service.kind as DetectedNeed)
+      return wanted.has(service.kind as Exclude<DetectedNeed, 'database'>)
     }),
   }
 }
@@ -248,7 +250,7 @@ export function dropCloudServicesNotInNeeds(project: Project, needs: DetectedNee
 export function ensureNeedServices(project: Project, needs: DetectedNeed[]): Project {
   const next: Project = { ...project, services: project.services.map((item) => ({ ...item })) }
   for (const need of needs) {
-    const key = need === 'database' ? 'supabase' : need
+    const key = (need === 'database' ? 'supabase' : need) as Exclude<DetectedNeed, 'database'>
     const meta = NEED_KIND[key]
     if (!meta) continue
     if (next.services.some((item) => item.kind === meta.kind)) continue

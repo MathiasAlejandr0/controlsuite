@@ -18,8 +18,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const data = loadWorkspace()
   const incident = data.incidents.find((item) => item.id === id)
   if (!incident) return NextResponse.json({ error: 'No existe' }, { status: 404 })
+  const now = new Date().toISOString()
   incident.status = parsed.data.status
-  incident.resolvedAt = parsed.data.status === 'resolved' ? new Date().toISOString() : undefined
+  incident.resolvedAt = parsed.data.status === 'resolved' ? now : undefined
+  if (parsed.data.status === 'acknowledged') incident.acknowledgedAt = now
+  if (parsed.data.status === 'open') incident.acknowledgedAt = undefined
   saveWorkspace(data)
   if (parsed.data.status === 'resolved') {
     appendAudit({ type: 'incident.resolved', label: incident.title })

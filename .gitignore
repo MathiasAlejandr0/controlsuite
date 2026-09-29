@@ -23,6 +23,8 @@ installer/app.ico
 # secretos y artefactos locales
 data/*.key
 data/.*.key
+data/watchdog.key
+data/**/*.key
 data/github-oauth.json
 *.tsbuildinfo
 *.zip

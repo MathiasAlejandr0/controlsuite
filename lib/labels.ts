@@ -28,6 +28,8 @@ export function incidentStatusLabel(status: string) {
   switch (status) {
     case 'open':
       return 'Abierto'
+    case 'acknowledged':
+      return 'Visto'
     case 'fixing':
       return 'En curso'
     case 'resolved':
@@ -87,11 +89,13 @@ export function healthStatusLabel(status: HealthStatus) {
 export function severityLabel(severity: IncidentSeverity) {
   switch (severity) {
     case 'critical':
-      return 'Crítico'
+      return 'Crítica'
     case 'high':
-      return 'Alto'
+      return 'Alta'
     case 'medium':
-      return 'Medio'
+      return 'Media'
+    case 'low':
+      return 'Baja'
   }
 }
 

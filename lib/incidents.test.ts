@@ -23,6 +23,14 @@ describe('mergeIncidents', () => {
     expect(next.detail).toBe('nuevo')
   })
 
+  it('conserva el visto mientras el check siga', () => {
+    const prev = [incident('a', { status: 'acknowledged', acknowledgedAt: '2026-01-02T00:00:00.000Z' })]
+    const [next] = mergeIncidents(prev, [incident('a', { detail: 'sigue' })])
+    expect(next.status).toBe('acknowledged')
+    expect(next.acknowledgedAt).toBe('2026-01-02T00:00:00.000Z')
+    expect(next.detail).toBe('sigue')
+  })
+
   it('cierra solo los que desaparecieron', () => {
     const merged = mergeIncidents([incident('gone'), incident('stay')], [incident('stay')])
     expect(merged.find((item) => item.id === 'gone')?.status).toBe('resolved')

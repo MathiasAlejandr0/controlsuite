@@ -88,7 +88,7 @@ export function failingIssues(project: Project, incidents: Incident[] = []): Pro
       detail: item.detail,
       source: item.environment,
       serviceName: item.environment,
-      severity: item.severity === 'medium' ? 'high' : item.severity,
+      severity: item.severity === 'critical' ? 'critical' : 'high',
     }))
 }
 

@@ -7,6 +7,7 @@ export async function checkTls(url: string): Promise<HealthCheck> {
   if (!allowed.ok) {
     return Promise.resolve({
       id: 'chk-tls',
+      code: 'tls.expiry',
       label: 'TLS y dominio',
       weight: 10,
       status: 'unknown',
@@ -23,6 +24,7 @@ export async function checkTls(url: string): Promise<HealthCheck> {
       if (!expires || Number.isNaN(expires.getTime())) {
         resolve({
           id: 'chk-tls',
+          code: 'tls.expiry',
           label: 'TLS y dominio',
           weight: 10,
           status: 'healthy',
@@ -34,6 +36,7 @@ export async function checkTls(url: string): Promise<HealthCheck> {
       const days = Math.round((expires.getTime() - Date.now()) / 86_400_000)
       resolve({
         id: 'chk-tls',
+        code: 'tls.expiry',
         label: 'TLS y dominio',
         weight: 10,
         status: days < 0 ? 'down' : days < 14 ? 'degraded' : 'healthy',
@@ -47,6 +50,7 @@ export async function checkTls(url: string): Promise<HealthCheck> {
     socket.on('error', (error) => {
       resolve({
         id: 'chk-tls',
+        code: 'tls.expiry',
         label: 'TLS y dominio',
         weight: 10,
         status: 'down',
@@ -58,6 +62,7 @@ export async function checkTls(url: string): Promise<HealthCheck> {
       socket.destroy()
       resolve({
         id: 'chk-tls',
+        code: 'tls.expiry',
         label: 'TLS y dominio',
         weight: 10,
         status: 'down',

@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react'
 import { ShieldCheck } from 'lucide-react'
 import { StatusPill } from '@/components/status-pill'
+import { isSecurityAlert, sortAlerts } from '@/lib/alerts'
 import { projectChecks } from '@/lib/health'
-import { auditTypeLabel, healthStatusLabel } from '@/lib/labels'
+import { auditTypeLabel, healthStatusLabel, severityLabel } from '@/lib/labels'
 import { staleSecrets } from '@/lib/secrets-hygiene'
 import type { AuditEvent } from '@/lib/types'
 import type { HistoryPoint } from '@/lib/history'
@@ -12,7 +13,8 @@ import { formatRelative } from '@/lib/utils'
 import { useWorkspace } from '@/lib/workspace'
 
 export default function SecurityPage() {
-  const { projects, audit, loadAudit } = useWorkspace()
+  const { projects, incidents, audit, loadAudit } = useWorkspace()
+  const attacks = sortAlerts(incidents.filter((item) => item.status !== 'resolved' && isSecurityAlert(item)))
   const [history, setHistory] = useState<HistoryPoint[]>([])
   const checks = projects.flatMap((project) =>
     projectChecks(project).map((check) => ({ project, check })),
@@ -100,6 +102,30 @@ export default function SecurityPage() {
             <span>sin rotar en 90 días</span>
           </div>
         </article>
+      </section>
+
+      <section className="section-block">
+        <h2>Ataques y exposición</h2>
+        <p className="modal-sub">
+          Firewall, secret scanning, Dependabot, TLS y picos de errores. El plan gratis de cada proveedor puede dejar alguna señal en “no disponible”.
+        </p>
+        <div className="check-list">
+          {attacks.map((incident) => {
+            const project = projects.find((item) => item.id === incident.projectId)
+            return (
+              <a key={incident.id} href={`/incidents`} className="check-row">
+                <div>
+                  <strong>
+                    {project?.name ?? incident.projectId} · {incident.title}
+                  </strong>
+                  <p>{incident.detail}</p>
+                </div>
+                <span className={`sev-badge sev-${incident.severity}`}>{severityLabel(incident.severity)}</span>
+              </a>
+            )
+          })}
+          {attacks.length === 0 && <div className="empty-state">Sin alertas de seguridad en el último sync.</div>}
+        </div>
       </section>
 
       <section className="section-block">

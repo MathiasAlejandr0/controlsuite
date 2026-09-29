@@ -1,8 +1,8 @@
 export type ProjectKind = 'web' | 'mobile' | 'desktop' | 'backend'
 export type ProjectTag = 'trabajo' | 'casa'
 export type HealthStatus = 'healthy' | 'degraded' | 'down' | 'unknown'
-export type IncidentStatus = 'open' | 'fixing' | 'resolved'
-export type IncidentSeverity = 'critical' | 'high' | 'medium'
+export type IncidentStatus = 'open' | 'acknowledged' | 'fixing' | 'resolved'
+export type IncidentSeverity = 'critical' | 'high' | 'medium' | 'low'
 export type ActivityTone = 'green' | 'blue' | 'amber' | 'purple'
 
 export type ServiceKind =
@@ -45,6 +45,8 @@ export type HealthCheck = {
   status: HealthStatus
   detail: string
   source: string
+  code?: string
+  href?: string
 }
 
 export type Service = {
@@ -71,6 +73,10 @@ export type Incident = {
   detectedAt: string
   lastSeenAt?: string
   resolvedAt?: string
+  acknowledgedAt?: string
+  source?: string
+  code?: string
+  href?: string
 }
 
 export type ActivityItem = {

@@ -6,6 +6,7 @@ const MAX_REDIRECTS = 5
 function check(status: HealthCheck['status'], detail: string): HealthCheck {
   return {
     id: 'chk-uptime',
+    code: 'http.uptime',
     label: 'Uptime HTTP',
     weight: 15,
     status,

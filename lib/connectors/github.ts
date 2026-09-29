@@ -98,6 +98,7 @@ export function repoHealthCheck(repo: GithubRepo): HealthCheck {
     status: repo.archived ? 'degraded' : 'healthy',
     detail: `${repo.private ? 'Privado' : 'Público'} · ${repo.language ?? 'sin lenguaje'} · último push ${when}`,
     source: 'GitHub',
+    code: 'github.repo',
   }
 }
 
@@ -122,6 +123,7 @@ export function commitChecksHealth(
     id: 'chk-github-checks',
     label: 'Checks del commit',
     weight: 10,
+    code: 'github.ci',
     status: failed.length ? 'down' : pending.length ? 'degraded' : 'healthy',
     detail:
       failed.length > 0
@@ -139,6 +141,7 @@ export function actionsHealthCheck(repo: string, run?: GithubRun, reachableWitho
       id: 'chk-ci',
       label: 'CI y supply chain',
       weight: 10,
+      code: 'github.ci',
       status: 'unknown',
       detail: `${repo} accesible. Sin permiso para Actions.`,
       source: 'GitHub',
@@ -149,6 +152,7 @@ export function actionsHealthCheck(repo: string, run?: GithubRun, reachableWitho
       id: 'chk-ci',
       label: 'CI y supply chain',
       weight: 10,
+      code: 'github.ci',
       status: 'unknown',
       detail: `${repo} sin workflow runs todavía.`,
       source: 'GitHub',
@@ -160,9 +164,11 @@ export function actionsHealthCheck(repo: string, run?: GithubRun, reachableWitho
     id: 'chk-ci',
     label: 'CI y supply chain',
     weight: 10,
+    code: 'github.ci',
     status: failed ? 'down' : pending ? 'degraded' : 'healthy',
     detail: `${run.name}: ${run.conclusion ?? run.status}`,
     source: 'GitHub',
+    href: run.html_url || undefined,
   }
 }
 
@@ -266,22 +272,157 @@ export async function checkGithub(repo: string, token?: string): Promise<HealthC
   })
   if (!runsRes.ok) {
     checks.push(actionsHealthCheck(repo, undefined, true))
-    return checks
-  }
-  const payload = (await runsRes.json()) as { workflow_runs?: GithubRun[] }
-  checks.push(actionsHealthCheck(repo, payload.workflow_runs?.[0]))
+  } else {
+    const payload = (await runsRes.json()) as { workflow_runs?: GithubRun[] }
+    checks.push(actionsHealthCheck(repo, payload.workflow_runs?.[0]))
 
-  const branch = encodeURIComponent(mapped.defaultBranch || 'main')
-  const checksRes = await fetch(`https://api.github.com/repos/${path}/commits/${branch}/check-runs?per_page=20`, {
+    const branch = encodeURIComponent(mapped.defaultBranch || 'main')
+    const checksRes = await fetch(`https://api.github.com/repos/${path}/commits/${branch}/check-runs?per_page=20`, {
+      headers: headers(token),
+      cache: 'no-store',
+    })
+    if (checksRes.ok) {
+      const checkPayload = (await checksRes.json()) as {
+        check_runs?: Array<{ name: string; status: string; conclusion: string | null }>
+      }
+      checks.push(commitChecksHealth(repo, checkPayload.check_runs))
+    }
+  }
+
+  checks.push(await dependabotCheck(path, repo, token))
+  checks.push(await secretScanningCheck(path, repo, token))
+  checks.push(await pullsCheck(path, repo, token))
+
+  return checks
+}
+
+type AlertRow = { state?: string; severity?: string; secret_type?: string; html_url?: string; number?: number }
+
+function alertRows(payload: unknown): AlertRow[] {
+  return Array.isArray(payload) ? (payload as AlertRow[]) : []
+}
+
+export function dependabotSummary(repo: string, alerts: AlertRow[], statusCode?: number): HealthCheck {
+  if (statusCode === 403 || statusCode === 404) {
+    return {
+      id: 'chk-dependabot',
+      label: 'Dependabot',
+      weight: 12,
+      status: 'unknown',
+      detail: `${repo} · el token no tiene security_events o Dependabot no está habilitado.`,
+      source: 'GitHub',
+      code: 'github.dependabot',
+    }
+  }
+  const high = alerts.filter((item) => item.severity === 'critical' || item.severity === 'high')
+  return {
+    id: 'chk-dependabot',
+    label: 'Dependabot',
+    weight: 12,
+    status: high.length ? 'down' : alerts.length ? 'degraded' : 'healthy',
+    detail: alerts.length
+      ? `${alerts.length} alertas abiertas · ${high.length} altas o críticas`
+      : `${repo} · sin alertas abiertas de Dependabot`,
+    source: 'GitHub',
+    code: 'github.dependabot',
+    href: `https://github.com/${repo}/security/dependabot`,
+  }
+}
+
+export function secretScanningSummary(repo: string, alerts: AlertRow[], statusCode?: number): HealthCheck {
+  if (statusCode === 403 || statusCode === 404) {
+    return {
+      id: 'chk-secrets',
+      label: 'Secret scanning',
+      weight: 14,
+      status: 'unknown',
+      detail: `${repo} · secret scanning no disponible con este token o plan.`,
+      source: 'GitHub',
+      code: 'github.secrets',
+    }
+  }
+  const first = alerts[0]
+  return {
+    id: 'chk-secrets',
+    label: 'Secret scanning',
+    weight: 16,
+    status: alerts.length ? 'down' : 'healthy',
+    detail: alerts.length
+      ? `${alerts.length} secretos abiertos${first?.secret_type ? ` · ${first.secret_type}` : ''}`
+      : `${repo} · sin secretos filtrados abiertos`,
+    source: 'GitHub',
+    code: 'github.secrets',
+    href: first?.html_url || `https://github.com/${repo}/security/secret-scanning`,
+  }
+}
+
+export function pullsSummary(repo: string, count: number): HealthCheck {
+  return {
+    id: 'chk-pulls',
+    label: 'Pull requests',
+    weight: 4,
+    status: count >= 8 ? 'degraded' : 'healthy',
+    detail: count ? `${repo} · ${count} PR abiertas` : `${repo} · sin PR abiertas`,
+    source: 'GitHub',
+    code: 'github.pulls',
+    href: `https://github.com/${repo}/pulls`,
+  }
+}
+
+async function dependabotCheck(path: string, repo: string, token?: string): Promise<HealthCheck> {
+  try {
+    const response = await fetch(`https://api.github.com/repos/${path}/dependabot/alerts?state=open&per_page=30`, {
+      headers: headers(token),
+      cache: 'no-store',
+    })
+    if (!response.ok) return dependabotSummary(repo, [], response.status)
+    return dependabotSummary(repo, alertRows(await response.json()))
+  } catch {
+    return dependabotSummary(repo, [], 404)
+  }
+}
+
+async function secretScanningCheck(path: string, repo: string, token?: string): Promise<HealthCheck> {
+  try {
+    const response = await fetch(`https://api.github.com/repos/${path}/secret-scanning/alerts?state=open&per_page=20`, {
+      headers: headers(token),
+      cache: 'no-store',
+    })
+    if (!response.ok) return secretScanningSummary(repo, [], response.status)
+    return secretScanningSummary(repo, alertRows(await response.json()))
+  } catch {
+    return secretScanningSummary(repo, [], 404)
+  }
+}
+
+async function pullsCheck(path: string, repo: string, token?: string): Promise<HealthCheck> {
+  try {
+    const response = await fetch(`https://api.github.com/repos/${path}/pulls?state=open&per_page=20`, {
+      headers: headers(token),
+      cache: 'no-store',
+    })
+    if (!response.ok) return pullsSummary(repo, 0)
+    const rows = (await response.json()) as unknown[]
+    return pullsSummary(repo, Array.isArray(rows) ? rows.length : 0)
+  } catch {
+    return pullsSummary(repo, 0)
+  }
+}
+
+export async function listGithubRepos(token: string) {
+  const response = await fetch('https://api.github.com/user/repos?per_page=40&sort=pushed&affiliation=owner,collaborator', {
     headers: headers(token),
     cache: 'no-store',
   })
-  if (checksRes.ok) {
-    const checkPayload = (await checksRes.json()) as {
-      check_runs?: Array<{ name: string; status: string; conclusion: string | null }>
-    }
-    checks.push(commitChecksHealth(repo, checkPayload.check_runs))
-  }
+  if (!response.ok) return []
+  const rows = (await response.json()) as GithubRepoRaw[]
+  return rows.map((row) => ({ id: row.full_name, label: row.full_name, hint: row.private ? 'privado' : 'público' }))
+}
 
-  return checks
+export async function validateGithubToken(token: string) {
+  const user = await fetchGithubUser(token).catch((error: unknown) => {
+    throw error instanceof Error ? error : new Error('GitHub rechazó el token.')
+  })
+  const resources = await listGithubRepos(token)
+  return { ok: true as const, account: user.login, resources }
 }

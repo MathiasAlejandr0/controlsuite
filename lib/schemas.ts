@@ -67,7 +67,15 @@ export const credentialsSchema = z.object({
 })
 
 export const incidentPatchSchema = z.object({
-  status: z.enum(['open', 'fixing', 'resolved']),
+  status: z.enum(['open', 'acknowledged', 'fixing', 'resolved']),
+})
+
+export const serviceConnectSchema = z.object({
+  kind: z.enum(['github', 'vercel', 'cloudflare', 'supabase', 'sentry']),
+  phase: z.enum(['validate', 'save', 'disconnect', 'forget', 'test']),
+  token: z.string().max(4000).optional(),
+  resourceId: z.string().max(300).optional(),
+  teamId: z.string().max(80).optional(),
 })
 
 export const diskPathSchema = z.object({
@@ -100,6 +108,8 @@ const healthCheckSchema = z.object({
   status: healthStatusSchema,
   detail: z.string(),
   source: z.string(),
+  code: z.string().optional(),
+  href: z.string().optional(),
 })
 
 const serviceSchema = z.object({

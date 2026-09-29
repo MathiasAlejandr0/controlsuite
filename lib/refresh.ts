@@ -1,12 +1,12 @@
-import { checkCloudflare } from './connectors/cloudflare'
+import { monitorCloudflare } from './connectors/cloudflare'
 import { checkDocker, composeFileFor } from './connectors/docker'
 import { checkGithub } from './connectors/github'
 import { checkHttp } from './connectors/http'
-import { checkSentry } from './connectors/sentry'
+import { monitorSentry } from './connectors/sentry'
 import { checkInsforge } from './connectors/insforge'
-import { checkSupabase } from './connectors/supabase'
+import { monitorSupabase } from './connectors/supabase'
 import { checkTls } from './connectors/tls'
-import { checkVercel } from './connectors/vercel'
+import { monitorVercel } from './connectors/vercel'
 import { ensureNeedServices } from './project-factory'
 import { reconcileProjectFromDisk } from './reconcile'
 import { appendHistory } from './history'
@@ -17,7 +17,7 @@ import { serviceStatus } from './health'
 import { detectedIncidents, mergeIncidents } from './incidents'
 import { loadWorkspace, saveWorkspace } from './store'
 import { withLock } from './lock'
-import type { ActivityItem, HealthCheck, Project, Service, WorkspaceData } from './types'
+import type { ActivityItem, Credentials, HealthCheck, Project, Service, WorkspaceData } from './types'
 
 function upsertCheck(service: Service, check: HealthCheck) {
   const index = service.checks.findIndex((item) => item.id === check.id)
@@ -61,7 +61,8 @@ function stripUptimeFromOthers(project: Project) {
 export type RefreshMode = 'public' | 'full'
 
 async function refreshProject(project: Project, mode: RefreshMode) {
-  const creds = mode === 'full' ? loadCredentials() : { integrations: {}, vercelTeamId: undefined }
+  const creds: Credentials =
+    mode === 'full' ? loadCredentials() : { integrations: {}, secrets: {} }
   const githubToken = mode === 'full' ? await githubAccessToken() : undefined
   const next: Project = {
     ...project,
@@ -114,23 +115,23 @@ async function refreshProject(project: Project, mode: RefreshMode) {
     }
     if (service.kind === 'vercel') {
       jobs.push(
-        checkVercel(service.externalId ?? '', creds.integrations.vercel, creds.vercelTeamId).then(
-          (check) => upsertCheck(service, check),
-        ),
+        monitorVercel(service.externalId ?? '', creds.integrations.vercel, creds.vercelTeamId).then((checks) => {
+          checks.forEach((check) => upsertCheck(service, check))
+        }),
       )
     }
     if (service.kind === 'cloudflare' && service.externalId && creds.integrations.cloudflare) {
       jobs.push(
-        checkCloudflare(service.externalId, creds.integrations.cloudflare).then((check) =>
-          upsertCheck(service, check),
-        ),
+        monitorCloudflare(service.externalId, creds.integrations.cloudflare).then((checks) => {
+          checks.forEach((check) => upsertCheck(service, check))
+        }),
       )
     }
     if (service.kind === 'supabase') {
       jobs.push(
-        checkSupabase(service.externalId ?? '', creds.integrations.supabase).then((check) =>
-          upsertCheck(service, check),
-        ),
+        monitorSupabase(service.externalId ?? '', creds.integrations.supabase).then((checks) => {
+          checks.forEach((check) => upsertCheck(service, check))
+        }),
       )
     }
     if (service.kind === 'insforge') {
@@ -149,9 +150,9 @@ async function refreshProject(project: Project, mode: RefreshMode) {
     }
     if (service.kind === 'sentry') {
       jobs.push(
-        checkSentry(service.externalId ?? '', creds.integrations.sentry).then((check) =>
-          upsertCheck(service, check),
-        ),
+        monitorSentry(service.externalId ?? '', creds.integrations.sentry).then((checks) => {
+          checks.forEach((check) => upsertCheck(service, check))
+        }),
       )
     }
   }

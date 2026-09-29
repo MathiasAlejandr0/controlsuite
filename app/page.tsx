@@ -14,7 +14,10 @@ import {
   ShieldCheck,
   TriangleAlert,
 } from 'lucide-react'
+import { sortAlerts } from '@/lib/alerts'
 import { isLiveProject, kindLabel, overallScore, projectStatus, sortByRisk } from '@/lib/health'
+import { severityLabel } from '@/lib/labels'
+import { remediationFor } from '@/lib/remediation'
 import { openIncidents } from '@/lib/incidents'
 import { greetingForHour, formatRelative } from '@/lib/utils'
 import { useWorkspace } from '@/lib/workspace'
@@ -52,7 +55,9 @@ export default function OverviewPage() {
   const online = projects.filter((project) => project.uptime === 'online').length
   const liveCount = projects.filter(isLiveProject).length
   const localCount = projects.length - liveCount
-  const incidents = openIncidents(allIncidents)
+  const incidents = sortAlerts(openIncidents(allIncidents))
+  const criticalCount = incidents.filter((item) => item.severity === 'critical').length
+  const highCount = incidents.filter((item) => item.severity === 'high').length
   const greeting = greetingForHour(new Date().getHours())
 
   return (
@@ -154,7 +159,9 @@ export default function OverviewPage() {
           <div className="metric-value">{String(incidents.length).padStart(2, '0')}</div>
           <div className="metric-footer">
             <span className={incidents.length ? 'trend-warn' : 'trend-up'}>
-              {incidents.length ? 'Generados desde checks reales' : 'Nada abierto'}
+              {incidents.length
+                ? `${criticalCount} críticas · ${highCount} altas`
+                : 'Nada abierto'}
             </span>
           </div>
         </div>
@@ -204,20 +211,23 @@ export default function OverviewPage() {
               </div>
               <span className="incident-number">{incidents.length}</span>
             </div>
-            {incidents.slice(0, 3).map((incident) => {
+            {incidents.slice(0, 4).map((incident) => {
               const project = projects.find((item) => item.id === incident.projectId)
               const critical = incident.severity === 'critical'
+              const guide = remediationFor(incident.code)
               return (
-                <Link key={incident.id} href={`/projects/${incident.projectId}`} className="incident-item">
+                <Link key={incident.id} href={`/incidents`} className="incident-item">
                   <div className={`incident-icon ${critical ? 'incident-red' : 'incident-amber'}`}>
                     {critical ? <TriangleAlert size={16} /> : <Database size={16} />}
                   </div>
                   <div>
                     <strong>{incident.title}</strong>
                     <p>
-                      {project?.name} · {incident.environment === 'production' ? 'producción' : incident.environment}
+                      {project?.name} · {severityLabel(incident.severity)} · {guide.steps[0]}
                     </p>
-                    <span className="incident-time">Detectado {formatRelative(incident.detectedAt)}</span>
+                    <span className="incident-time">
+                      Visto por primera vez {formatRelative(incident.detectedAt)}
+                    </span>
                   </div>
                 </Link>
               )

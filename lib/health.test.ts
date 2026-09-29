@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { computeScoreFromChecks, isLiveProject, projectScore, projectStatus } from './health'
 import type { HealthCheck, Project } from './types'
 
-const check = (status: HealthCheck['status'], weight: number, id = status): HealthCheck => ({
+const check = (status: HealthCheck['status'], weight: number, id: string = status): HealthCheck => ({
   id,
   label: id,
   weight,

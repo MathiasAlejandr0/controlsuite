@@ -53,7 +53,7 @@ export async function runWatchdogTick(): Promise<WatchdogStatus> {
   }
 
   const before = loadWorkspace()
-  const data = await refreshWorkspace(undefined, { mode: 'public', reconcile: true })
+  const data = await refreshWorkspace(undefined, { mode: 'full', reconcile: true })
   queueRemediations(data.incidents)
   const actions: string[] = []
 

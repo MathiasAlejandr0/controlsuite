@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { sanitizeImportedProject } from './catalog-sanitize'
 import { resolveCursorTarget } from './cursor'
 import { safeHttpUrl } from './safe-url'
@@ -53,10 +53,9 @@ describe('resolveCursorTarget', () => {
 
 describe('sessionBypassed', () => {
   it('no abre el PIN en production aunque VITEST esté puesto', () => {
-    const previous = process.env.NODE_ENV
-    process.env.NODE_ENV = 'production'
-    process.env.VITEST = 'true'
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('VITEST', 'true')
     expect(sessionBypassed()).toBe(false)
-    process.env.NODE_ENV = previous
+    vi.unstubAllEnvs()
   })
 })

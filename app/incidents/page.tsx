@@ -1,15 +1,20 @@
 'use client'
 
-import Link from 'next/link'
-import { Sparkles, RefreshCw, TriangleAlert } from 'lucide-react'
-import { incidentStatusLabel, severityLabel } from '@/lib/labels'
-import { formatRelative } from '@/lib/utils'
+import { RefreshCw } from 'lucide-react'
+import { IncidentCard } from '@/components/incident-card'
+import { sortAlerts } from '@/lib/alerts'
 import { useWorkspace } from '@/lib/workspace'
 
 export default function IncidentsPage() {
   const { incidents, projects, refresh, refreshing, resolveIncident, openCursor } = useWorkspace()
-  const open = incidents.filter((item) => item.status !== 'resolved')
+  const open = sortAlerts(incidents.filter((item) => item.status !== 'resolved'))
   const resolved = incidents.filter((item) => item.status === 'resolved')
+  const counts = {
+    critical: open.filter((item) => item.severity === 'critical').length,
+    high: open.filter((item) => item.severity === 'high').length,
+    medium: open.filter((item) => item.severity === 'medium').length,
+    low: open.filter((item) => item.severity === 'low').length,
+  }
 
   return (
     <>
@@ -20,9 +25,12 @@ export default function IncidentsPage() {
             Centro de incidentes
           </div>
           <h1>
-            Ciclo de vida, no un snapshot<span className="heading-period">.</span>
+            Alertas con qué hacer<span className="heading-period">.</span>
           </h1>
-          <p>Un down sobrevive al re-sync hasta que lo cerrás. Si el check sana, se cierra solo.</p>
+          <p>
+            Se deduplican por proyecto y check. La primera vez se conserva. Si el check sana, se cierran solas.
+            Crítica y alta también avisan en Windows.
+          </p>
         </div>
         <button type="button" className="ghost-button" disabled={refreshing} onClick={() => void refresh()}>
           <RefreshCw size={16} />
@@ -30,49 +38,29 @@ export default function IncidentsPage() {
         </button>
       </section>
 
+      <section className="severity-row" aria-label="Alertas por severidad">
+        <span className="sev-badge sev-critical">{counts.critical} críticas</span>
+        <span className="sev-badge sev-high">{counts.high} altas</span>
+        <span className="sev-badge sev-medium">{counts.medium} medias</span>
+        <span className="sev-badge sev-low">{counts.low} bajas</span>
+      </section>
+
       <div className="incident-stack">
-        {open.map((incident) => {
-          const project = projects.find((item) => item.id === incident.projectId)
-          return (
-            <article key={incident.id} className="stack-card">
-              <div className="panel-header" style={{ padding: 0 }}>
-                <div>
-                  <h2>{incident.title}</h2>
-                  <p>{incident.detail}</p>
-                </div>
-                <span className={`incident-icon ${incident.severity === 'critical' ? 'incident-red' : 'incident-amber'}`}>
-                  <TriangleAlert size={16} />
-                </span>
-              </div>
-              <div className="detail-meta">
-                <Link href={`/projects/${incident.projectId}`}>
-                  <strong>{project?.name}</strong>
-                </Link>
-                <span>{incidentStatusLabel(incident.status)}</span>
-                <span>{severityLabel(incident.severity)}</span>
-                <span>{formatRelative(incident.detectedAt)}</span>
-                <button
-                  type="button"
-                  className="ghost-button"
-                  onClick={() => void openCursor(incident.projectId, incident.id)}
-                >
-                  <Sparkles size={14} />
-                  Abrir en Cursor
-                </button>
-                <button
-                  type="button"
-                  className="ghost-button"
-                  onClick={() => void resolveIncident(incident.id)}
-                >
-                  Resolver
-                </button>
-              </div>
-            </article>
-          )
-        })}
+        {open.map((incident) => (
+          <IncidentCard
+            key={incident.id}
+            incident={incident}
+            project={projects.find((item) => item.id === incident.projectId)}
+            onAcknowledge={
+              incident.status === 'open' ? () => void resolveIncident(incident.id, 'acknowledged') : undefined
+            }
+            onResolve={() => void resolveIncident(incident.id, 'resolved')}
+            onCursor={() => void openCursor(incident.projectId, incident.id)}
+          />
+        ))}
         {open.length === 0 && (
           <div className="empty-state">
-            Nada abierto. Si un sitio live se cae, aparece acá y en un aviso de Windows.
+            Nada abierto. Un sitio caído, un deploy rojo o un pico de firewall aparece acá y, si es crítica o alta, en un aviso de Windows.
           </div>
         )}
       </div>
@@ -82,10 +70,7 @@ export default function IncidentsPage() {
           <h2>Resueltos</h2>
           <div className="incident-stack">
             {resolved.map((incident) => (
-              <Link key={incident.id} href={`/projects/${incident.projectId}`} className="stack-card">
-                <strong>{incident.title}</strong>
-                <p>{incident.detail}</p>
-              </Link>
+              <IncidentCard key={incident.id} incident={incident} project={projects.find((item) => item.id === incident.projectId)} />
             ))}
           </div>
         </section>

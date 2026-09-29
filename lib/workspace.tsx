@@ -100,7 +100,7 @@ type WorkspaceContextValue = {
     prompt?: string
     injected?: boolean
   }>
-  resolveIncident: (id: string, status?: 'open' | 'fixing' | 'resolved') => Promise<void>
+  resolveIncident: (id: string, status?: 'open' | 'acknowledged' | 'fixing' | 'resolved') => Promise<void>
   gate: 'loading' | 'setup' | 'locked' | 'open' | 'recover'
   recoverTarget: 'workspace' | 'credentials' | null
   unlock: (pin: string) => Promise<boolean>
@@ -252,6 +252,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const refreshRef = useRef(refresh)
   refreshRef.current = refresh
+  useEffect(() => {
+    if (gate !== 'open') return
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      void reload().catch(() => undefined)
+    }, 20_000)
+    return () => window.clearInterval(timer)
+  }, [gate, reload])
+
   useEffect(() => {
     if (gate !== 'open') return
     const timer = window.setInterval(() => {
@@ -463,7 +472,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   )
 
   const resolveIncident = useCallback(
-    async (id: string, status: 'open' | 'fixing' | 'resolved' = 'resolved') => {
+    async (id: string, status: 'open' | 'acknowledged' | 'fixing' | 'resolved' = 'resolved') => {
       const response = await fetch(`/api/incidents/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -474,7 +483,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         return
       }
       applyPayload(await response.json())
-      pushToast(status === 'resolved' ? 'Incidente cerrado' : 'Incidente actualizado')
+      pushToast(
+        status === 'resolved' ? 'Incidente cerrado' : status === 'acknowledged' ? 'Incidente marcado como visto' : 'Incidente actualizado',
+      )
     },
     [applyPayload, pushToast],
   )

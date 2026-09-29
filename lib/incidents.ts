@@ -1,4 +1,4 @@
-import { isLiveProject } from './health'
+import { alertFromCheck, dedupeAlerts } from './alerts'
 import type { Incident, Project } from './types'
 
 export function detectedIncidents(projects: Project[]): Incident[] {
@@ -6,23 +6,14 @@ export function detectedIncidents(projects: Project[]): Incident[] {
   const incidents: Incident[] = []
   for (const project of projects) {
     for (const service of project.services) {
+      if (service.accessOnly) continue
       for (const check of service.checks) {
-        if (check.status === 'healthy' || check.status === 'unknown') continue
-        incidents.push({
-          id: `${project.id}-${check.id}`,
-          projectId: project.id,
-          title: `${check.label} · ${project.name}`,
-          detail: check.detail,
-          environment: isLiveProject(project) ? 'production' : 'local',
-          status: 'open',
-          severity: check.status === 'down' ? 'critical' : 'high',
-          detectedAt: project.lastSyncedAt ?? now,
-          lastSeenAt: now,
-        })
+        const alert = alertFromCheck(project, service, check, now)
+        if (alert) incidents.push(alert)
       }
     }
   }
-  return incidents
+  return dedupeAlerts(incidents)
 }
 
 export function mergeIncidents(previous: Incident[], detected: Incident[]): Incident[] {
@@ -32,14 +23,19 @@ export function mergeIncidents(previous: Incident[], detected: Incident[]): Inci
   for (const item of detected) {
     const old = prev.get(item.id)
     if (old) {
+      const reopened = old.status === 'resolved'
       next.push({
         ...old,
         title: item.title,
         detail: item.detail,
         severity: item.severity,
+        source: item.source,
+        code: item.code,
+        href: item.href,
         lastSeenAt: item.lastSeenAt,
-        status: old.status === 'resolved' ? 'open' : old.status,
-        resolvedAt: old.status === 'resolved' ? undefined : old.resolvedAt,
+        status: reopened ? 'open' : old.status,
+        resolvedAt: reopened ? undefined : old.resolvedAt,
+        acknowledgedAt: reopened ? undefined : old.acknowledgedAt,
       })
       prev.delete(item.id)
     } else {

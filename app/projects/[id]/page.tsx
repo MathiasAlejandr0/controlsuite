@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { use, useMemo, useState } from 'react'
 import {
-  ArrowUpRight,
   ExternalLink,
   FolderGit2,
   LockKeyhole,
@@ -13,16 +12,17 @@ import {
 } from 'lucide-react'
 import { CursorModal } from '@/components/cursor-modal'
 import { ProjectAccess } from '@/components/project-access'
+import { IncidentCard } from '@/components/incident-card'
 import { ProjectConnections } from '@/components/project-connections'
+import { ServiceConnect } from '@/components/service-connect'
 import { ProjectLinkPanel } from '@/components/project-link-panel'
 import { ProjectOps } from '@/components/project-ops'
 import { ProjectIcon } from '@/components/project-icon'
 import { StatusPill } from '@/components/status-pill'
 import { kindLabel, projectChecks, projectCoverage, projectScore, projectStatus, serviceStatus, statusLabel } from '@/lib/health'
 import { composeRemediationPrompt } from '@/lib/prompt-engineer'
-import { serviceMeta, severityLabel, uptimeLabel } from '@/lib/labels'
+import { serviceMeta, uptimeLabel } from '@/lib/labels'
 import { safeHttpUrl } from '@/lib/safe-url'
-import { formatRelative } from '@/lib/utils'
 import { useWorkspace } from '@/lib/workspace'
 
 export default function ProjectDetailPage({
@@ -31,7 +31,7 @@ export default function ProjectDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = use(params)
-  const { openReveal, projects, incidents: allIncidents, refresh, refreshing, ready, deleteProject } =
+  const { openReveal, projects, incidents: allIncidents, refresh, refreshing, ready, deleteProject, resolveIncident, openCursor } =
     useWorkspace()
   const project = projects.find((item) => item.id === id)
   const [cursorOpen, setCursorOpen] = useState(false)
@@ -53,7 +53,13 @@ export default function ProjectDetailPage({
   )
 
   if (!ready) {
-    return <div className="empty-state">Cargando proyecto…</div>
+    return (
+      <div className="skeleton-stack" aria-hidden="true">
+        <div className="skeleton skeleton-title" />
+        <div className="skeleton" />
+        <div className="skeleton" />
+      </div>
+    )
   }
 
   if (!project) {
@@ -194,6 +200,8 @@ export default function ProjectDetailPage({
 
       <ProjectOps project={project} />
 
+      <ServiceConnect project={project} />
+
       <ProjectLinkPanel projectId={project.id} />
 
       <ProjectConnections project={project} />
@@ -317,29 +325,23 @@ export default function ProjectDetailPage({
           <h2>Incidentes de este proyecto</h2>
           <div className="incident-stack">
             {incidents.map((incident) => (
-              <article key={incident.id} className="stack-card">
-                <div className="panel-header" style={{ padding: 0 }}>
-                  <div>
-                    <h2>{incident.title}</h2>
-                    <p>{incident.detail}</p>
-                  </div>
-                  <span className="chip">{severityLabel(incident.severity)}</span>
-                </div>
-                <div className="detail-meta">
-                  <span>{incident.environment}</span>
-                  <span>{formatRelative(incident.detectedAt)}</span>
-                  <button
-                    type="button"
-                    className="ghost-button"
-                    onClick={() => {
-                      setCursorIncidentId(incident.id)
-                      setCursorOpen(true)
-                    }}
-                  >
-                    Subsana en Cursor <ArrowUpRight size={14} />
-                  </button>
-                </div>
-              </article>
+              <IncidentCard
+                key={incident.id}
+                incident={incident}
+                onAcknowledge={
+                  incident.status === 'open'
+                    ? () => void resolveIncident(incident.id, 'acknowledged')
+                    : undefined
+                }
+                onResolve={
+                  incident.status !== 'resolved' ? () => void resolveIncident(incident.id, 'resolved') : undefined
+                }
+                onCursor={() => {
+                  setCursorIncidentId(incident.id)
+                  setCursorOpen(true)
+                  void openCursor(project.id, incident.id)
+                }}
+              />
             ))}
           </div>
         </section>

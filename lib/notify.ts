@@ -4,7 +4,12 @@ import type { Incident } from './types'
 export function newProductionIncidents(previous: Incident[], next: Incident[]) {
   const seen = new Set(previous.filter((item) => item.status !== 'resolved').map((item) => item.id))
   return next.filter(
-    (item) => item.status !== 'resolved' && item.environment === 'production' && !seen.has(item.id),
+    (item) =>
+      item.status !== 'resolved' &&
+      item.status !== 'acknowledged' &&
+      item.environment === 'production' &&
+      (item.severity === 'critical' || item.severity === 'high') &&
+      !seen.has(item.id),
   )
 }
 

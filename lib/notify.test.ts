@@ -15,6 +15,15 @@ const incident = (id: string, extra: Partial<Incident> = {}): Incident => ({
 })
 
 describe('newProductionIncidents', () => {
+  it('no avisa media, baja ni local', () => {
+    const next = [
+      incident('media', { severity: 'medium' }),
+      incident('baja', { severity: 'low' }),
+      incident('local', { environment: 'local' }),
+    ]
+    expect(newProductionIncidents([], next)).toEqual([])
+  })
+
   it('solo avisa issues de producción que no estaban', () => {
     const prev = [incident('old')]
     const next = [incident('old'), incident('new'), incident('local', { environment: 'local' })]

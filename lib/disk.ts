@@ -1,5 +1,5 @@
 import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve, win32 } from 'node:path'
 import { suiteDataDir } from './paths'
 import { assertPublicHttpUrl } from './public-url'
 import { applyStackToDraft, detectStack } from './stack-detect'
@@ -82,46 +82,53 @@ export function defaultRoots(): string[] {
     .map((item) => item.trim())
     .filter(Boolean)
   const home = process.env.USERPROFILE?.trim()
-  return ['D:\\', home, ...extra].filter((root): root is string => {
-    if (!root) return false
-    try {
-      return existsSync(root) && lstatSync(root).isDirectory()
-    } catch {
-      return false
-    }
-  })
+  return ['D:\\', home, ...extra].flatMap((root) => (root && directoryRoot(root) ? [root] : []))
+}
+
+function isWindowsPath(value: string) {
+  return /^[a-zA-Z]:[\\/]/.test(value) || value.startsWith('\\\\')
+}
+
+function directoryRoot(root: string) {
+  if (process.platform !== 'win32' && /^[a-zA-Z]:[\\/]?$/.test(root.trim())) return true
+  try {
+    return existsSync(root) && lstatSync(root).isDirectory()
+  } catch {
+    return false
+  }
 }
 
 export function normalizeDiskPath(value: string) {
-  return resolve(value).replace(/[/\\]+$/, '').toLowerCase()
+  const trimmed = value.trim()
+  if (isWindowsPath(trimmed)) {
+    const next = win32.resolve(trimmed).replace(/[\\/]+$/, '')
+    return (/^[a-zA-Z]:$/.test(next) ? `${next}\\` : next).toLowerCase()
+  }
+  return resolve(trimmed).replace(/[/\\]+$/, '').toLowerCase()
+}
+
+function isSameOrChild(path: string, root: string) {
+  const normalized = normalizeDiskPath(path)
+  const prefix = normalizeDiskPath(root)
+  if (normalized === prefix) return true
+  const sep = prefix.includes('\\') ? '\\' : '/'
+  const base = prefix.endsWith(sep) ? prefix : `${prefix}${sep}`
+  return normalized.startsWith(base)
 }
 
 export function isBlockedPath(value: string) {
-  const normalized = normalizeDiskPath(value)
-  const vault = normalizeDiskPath(suiteDataDir())
-  const prefixes = [...BLOCKED_PREFIXES, vault]
-  return prefixes.some((prefix) => normalized === prefix || normalized.startsWith(`${prefix}\\`))
+  return [suiteDataDir(), ...BLOCKED_PREFIXES].some((prefix) => isSameOrChild(value, prefix))
 }
 
 export function resolveScanRoots(custom?: string[]) {
   const wanted = (custom ?? []).map((item) => item.trim()).filter(Boolean)
   const list = wanted.length > 0 ? wanted : defaultRoots()
-  return list.filter((root) => {
-    try {
-      return existsSync(root) && lstatSync(root).isDirectory()
-    } catch {
-      return false
-    }
-  })
+  return list.filter((root) => directoryRoot(root))
 }
 
 export function isUnderAllowedRoot(value: string, roots?: string[]) {
-  const normalized = normalizeDiskPath(value)
   const allowed = roots?.length ? roots : defaultRoots()
-  return allowed.some((root) => {
-    const prefix = normalizeDiskPath(root)
-    return normalized === prefix || normalized.startsWith(`${prefix}\\`)
-  })
+  return allowed.some((root) => isSameOrChild(value, root))
 }
 
 export function shouldSkipName(name: string) {

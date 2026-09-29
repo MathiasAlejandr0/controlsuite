@@ -88,7 +88,7 @@ export function ProjectLinkPanel({ projectId }: { projectId: string }) {
     const latest = projects.find((item) => item.id === projectId)
     const email = (latest ?? project)?.services.find((item) => item.kind === 'email')
     const login = email?.secretRefs.find(isAccountLogin)
-    if (!login) {
+    if (!email || !login) {
       pushToast('Aplicá los IDs detectados para crear el correo en la bóveda', 'warn')
       return
     }

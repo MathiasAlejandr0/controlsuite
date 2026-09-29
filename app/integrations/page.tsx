@@ -42,10 +42,10 @@ const CLOUD: Array<{ kind: ServiceKind; note: string; live?: IntegrationId | 'ht
   { kind: 'github', note: 'Cuenta + repos + Actions', live: 'github' },
   { kind: 'docker', note: 'Daemon local y compose', live: 'docker' },
   { kind: 'uptime', note: 'HTTP + TLS sin token', live: 'http' },
-  { kind: 'vercel', note: 'Último deployment', live: 'vercel' },
-  { kind: 'cloudflare', note: 'Zona + vencimiento TLS', live: 'cloudflare' },
-  { kind: 'supabase', note: 'Estado del proyecto', live: 'supabase' },
-  { kind: 'sentry', note: 'Issues del proyecto', live: 'sentry' },
+  { kind: 'vercel', note: 'Deploys, build, runtime, dominio y firewall', live: 'vercel' },
+  { kind: 'cloudflare', note: 'Zona, SSL, WAF y picos', live: 'cloudflare' },
+  { kind: 'supabase', note: 'Salud, advisors, backups y uso', live: 'supabase' },
+  { kind: 'sentry', note: 'Issues abiertas y picos', live: 'sentry' },
 ]
 
 function tone(status: HealthStatus) {
