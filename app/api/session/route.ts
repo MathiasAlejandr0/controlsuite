@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { allowRate } from '@/lib/rate-limit'
 import { CredentialsCorruptError, loadCredentials, saveCredentials } from '@/lib/credentials'
+import { VaultKeyError } from '@/lib/protect'
 import { hashPin, isPinStrong, verifyPin } from '@/lib/pin'
 import { pinSchema } from '@/lib/schemas'
 import {
@@ -24,6 +25,9 @@ export function GET(request: Request) {
       unlocked,
     })
   } catch (error) {
+    if (error instanceof VaultKeyError) {
+      return NextResponse.json({ hasPin: false, unlocked: false, corrupt: 'vault-key', error: error.message }, { status: 500 })
+    }
     if (error instanceof CredentialsCorruptError) {
       return NextResponse.json({ hasPin: false, unlocked: false, corrupt: 'credentials' }, { status: 500 })
     }

@@ -11,6 +11,7 @@ import type { HealthStatus } from './types'
 
 const TICK_GAP_MS = 3 * 60 * 1000
 const STALE_GAP_MS = 24 * 60 * 60 * 1000
+let ticking = false
 
 export type WatchdogStatus = {
   skipped?: boolean
@@ -45,15 +46,32 @@ export function readWatchdogStatus(): WatchdogStatus {
 }
 
 export async function runWatchdogTick(): Promise<WatchdogStatus> {
+  if (ticking) return { skipped: true, ...readWatchdogStatus() }
+  ticking = true
+  try {
+    return await runWatchdogTickBody()
+  } finally {
+    ticking = false
+  }
+}
+
+async function runWatchdogTickBody(): Promise<WatchdogStatus> {
   ensureWatchdogKey()
   const ops = loadOps()
   const now = Date.now()
   if (ops.lastTickAt && now - Date.parse(ops.lastTickAt) < TICK_GAP_MS) {
     return { skipped: true, ...readWatchdogStatus() }
   }
+  ops.lastTickAt = new Date().toISOString()
+  saveOps(ops)
 
   const before = loadWorkspace()
-  const data = await refreshWorkspace(undefined, { mode: 'full', reconcile: true })
+  let data
+  try {
+    data = await refreshWorkspace(undefined, { mode: 'full', reconcile: true })
+  } catch {
+    return { ...readWatchdogStatus(), actions: ['proveedor no respondió'] }
+  }
   queueRemediations(data.incidents)
   const actions: string[] = []
 

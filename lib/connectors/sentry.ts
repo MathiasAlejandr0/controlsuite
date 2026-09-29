@@ -1,3 +1,4 @@
+import { fetchJson } from './probe'
 import type { HealthCheck } from '../types'
 
 export function parseSentrySlug(value?: string) {
@@ -45,12 +46,11 @@ export function summarizeSentrySpike(counts: number[]): HealthCheck {
 }
 
 export async function listSentryProjects(token: string) {
-  const response = await fetch('https://sentry.io/api/0/projects/', {
+  const response = await fetchJson('https://sentry.io/api/0/projects/', {
     headers: { Authorization: `Bearer ${token}` },
-    signal: AbortSignal.timeout(12_000),
   })
   if (!response.ok) return []
-  const rows = (await response.json()) as Array<{ organization?: { slug?: string }; slug?: string; name?: string }>
+  const rows = (response.body ?? []) as Array<{ organization?: { slug?: string }; slug?: string; name?: string }>
   return rows.flatMap((row) => {
     const org = row.organization?.slug
     const slug = row.slug
@@ -60,9 +60,8 @@ export async function listSentryProjects(token: string) {
 }
 
 export async function validateSentryToken(token: string) {
-  const response = await fetch('https://sentry.io/api/0/projects/', {
+  const response = await fetchJson('https://sentry.io/api/0/projects/', {
     headers: { Authorization: `Bearer ${token}` },
-    signal: AbortSignal.timeout(12_000),
   })
   if (response.status === 401 || response.status === 403) {
     return {

@@ -15,6 +15,13 @@ export type VaultEnvelope = {
   data: string
 }
 
+export class VaultKeyError extends Error {
+  constructor() {
+    super('Falta la clave del vault (.vault.key). No se creó otra para no dejar los tokens ilegibles.')
+    this.name = 'VaultKeyError'
+  }
+}
+
 export function isVaultEnvelope(value: unknown): value is VaultEnvelope {
   if (!value || typeof value !== 'object') return false
   const row = value as Record<string, unknown>
@@ -67,6 +74,7 @@ $prot = [Security.Cryptography.ProtectedData]::Protect($raw, $null, [Security.Cr
 function readAesKey(): Buffer {
   if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true })
   if (!existsSync(keyFile)) {
+    if (existsSync(join(dataDir, 'credentials.json'))) throw new VaultKeyError()
     const raw = randomBytes(32)
     const stored = process.platform === 'win32' ? dpapi(raw, false) : raw
     writeFileSync(keyFile, stored)

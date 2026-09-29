@@ -12,6 +12,7 @@ import { projectChecks, projectStatus } from '@/lib/health'
 import { composeRemediationPrompt } from '@/lib/prompt-engineer'
 import { safeHttpUrl } from '@/lib/safe-url'
 import { useWorkspace } from '@/lib/workspace'
+import { EmptyState, LoadingState } from '@/components/ui/empty-state'
 
 export default function ProjectDetailPage({
   params,
@@ -24,13 +25,13 @@ export default function ProjectDetailPage({
   const [cursorOpen, setCursorOpen] = useState(false)
   const [secretDrafts, setSecretDrafts] = useState<Record<string, string>>({})
 
-  if (!ready) return <p className="quiet-empty">Cargando…</p>
+  if (!ready) return <LoadingState />
 
   if (!project) {
     return (
-      <p className="quiet-empty">
+      <EmptyState>
         Proyecto no encontrado. <Link href="/projects">Volver</Link>
-      </p>
+      </EmptyState>
     )
   }
 

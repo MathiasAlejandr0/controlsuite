@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { AccountDialog } from '@/components/account-dialog'
+import { ServiceCard } from '@/components/service-card'
+import { EmptyState } from '@/components/ui/empty-state'
 import { TOKEN_GUIDES, type ConnectKind } from '@/lib/service-link'
 import { useWorkspace } from '@/lib/workspace'
 
@@ -15,6 +17,7 @@ export default function IntegrationsPage() {
   const [repos, setRepos] = useState<AccountRepo[]>([])
   const [selected, setSelected] = useState<string[]>([])
   const [importing, setImporting] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     if (!credentials.integrations.github) {
@@ -22,13 +25,23 @@ export default function IntegrationsPage() {
       return
     }
     void fetch('/api/github/account')
-      .then((response) => (response.ok ? response.json() : null))
+      .then(async (response) => {
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}))
+          throw new Error(payload.error ?? 'No se pudo leer GitHub')
+        }
+        return response.json()
+      })
       .then((payload) => {
         const list = (payload?.repos ?? []) as AccountRepo[]
         setRepos(list)
         setSelected(list.filter((repo) => !repo.alreadyImported).map((repo) => repo.fullName))
+        setError('')
       })
-      .catch(() => setRepos([]))
+      .catch((cause: unknown) => {
+        setRepos([])
+        setError(cause instanceof Error ? cause.message : 'No se pudo leer GitHub')
+      })
   }, [credentials.integrations.github])
 
   async function forget(kind: ConnectKind) {
@@ -50,43 +63,37 @@ export default function IntegrationsPage() {
       <section className="page-heading">
         <div>
           <h1>Cuentas</h1>
-          <p>Conectá cada proveedor una vez. Después, en el proyecto, solo confirmás el recurso.</p>
+          <p>Cada proveedor se conecta una vez y vale para todos los proyectos.</p>
         </div>
       </section>
 
-      <div className="stack">
+      <div className="svc-grid">
         {KINDS.map((kind) => {
           const connected = Boolean(credentials.integrations[kind])
-          const firstMissing = KINDS.find((item) => !credentials.integrations[item])
           return (
-            <article key={kind} className="quiet-row">
-              <span className={`status-dot ${connected ? 'dot-healthy' : 'dot-unknown'}`} />
-              <div className="quiet-copy">
-                <strong>{TOKEN_GUIDES[kind].label}</strong>
-                <span>{connected ? 'Conectada' : 'Falta conectar'}</span>
-              </div>
-              {connected ? (
-                <button type="button" className="text-button" onClick={() => void forget(kind)}>
-                  Quitar
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className={kind === firstMissing ? 'primary-button' : 'ghost-button'}
-                  onClick={() => setDialog(kind)}
-                >
-                  Conectar
-                </button>
-              )}
-            </article>
+            <ServiceCard
+              key={kind}
+              title={TOKEN_GUIDES[kind].label}
+              hint={connected ? 'Lista para usar en los proyectos' : 'Todavía no hay cuenta'}
+              tone={connected ? 'ok' : 'off'}
+              badge={connected ? 'Conectada' : 'Falta conectar'}
+              primaryLabel={connected ? undefined : 'Conectar'}
+              onPrimary={connected ? undefined : () => setDialog(kind)}
+              menu={
+                connected
+                  ? [{ label: 'Quitar cuenta', onSelect: () => void forget(kind) }]
+                  : []
+              }
+            />
           )
         })}
       </div>
 
       <details className="fold">
         <summary>Importar repos de GitHub</summary>
-        {!credentials.integrations.github && <p className="quiet-empty">Primero conectá GitHub.</p>}
-        {credentials.integrations.github && repos.length === 0 && <p className="quiet-empty">No hay repos para importar.</p>}
+        {!credentials.integrations.github && <EmptyState>Primero conectá GitHub.</EmptyState>}
+        {error && <p className="form-error">{error}</p>}
+        {credentials.integrations.github && !error && repos.length === 0 && <EmptyState>No hay repos para importar.</EmptyState>}
         <div className="stack">
           {repos.map((repo) => (
             <label key={repo.fullName} className="quiet-row">
@@ -102,14 +109,14 @@ export default function IntegrationsPage() {
                   )
                 }
               />
-              <span>{repo.alreadyImported ? `${repo.fullName} · ya está` : repo.fullName}</span>
+              <span className="truncate">{repo.alreadyImported ? `${repo.fullName} · ya está` : repo.fullName}</span>
             </label>
           ))}
         </div>
         {selected.length > 0 && (
           <button
             type="button"
-            className="ghost-button"
+            className="btn btn-ghost"
             disabled={importing}
             onClick={() => {
               setImporting(true)

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { CredentialsCorruptError } from '@/lib/credentials'
+import { VaultKeyError } from '@/lib/protect'
 import { denyIfLocked } from '@/lib/guard'
 import { loadWorkspace, WorkspaceCorruptError } from '@/lib/store'
 import { ensureWatchdogKey } from '@/lib/watchdog-auth'
@@ -21,6 +22,9 @@ export function GET(request: Request) {
     }
     if (error instanceof CredentialsCorruptError) {
       return NextResponse.json({ error: error.message, code: 'corrupt-credentials' }, { status: 500 })
+    }
+    if (error instanceof VaultKeyError) {
+      return NextResponse.json({ error: error.message, code: 'vault-key' }, { status: 500 })
     }
     throw error
   }

@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Check } from 'lucide-react'
 import { AccountDialog } from '@/components/account-dialog'
+import { ServiceCard } from '@/components/service-card'
+import { Button } from '@/components/ui/button'
+import { toneForLink } from '@/components/ui/status-badge'
 import type { AutoconnectItem } from '@/lib/autoconnect'
 import { connectionState } from '@/lib/connection-status'
 import { TOKEN_GUIDES, type ConnectKind } from '@/lib/service-link'
@@ -12,15 +14,15 @@ import { useWorkspace } from '@/lib/workspace'
 const KINDS: ConnectKind[] = ['github', 'vercel', 'supabase', 'cloudflare', 'sentry']
 
 type Hint = { kind: ConnectKind; id?: string; evidence: string }
+type Resource = { id: string; label: string }
 
 export function ConnectPanel({ project }: { project: Project }) {
   const { credentials, reload, pushToast, refresh } = useWorkspace()
   const [dialog, setDialog] = useState<ConnectKind | null>(null)
   const [busy, setBusy] = useState(false)
-  const [showAll, setShowAll] = useState(false)
   const [hints, setHints] = useState<Hint[]>([])
   const [choices, setChoices] = useState<Partial<Record<ConnectKind, string>>>({})
-  const [lists, setLists] = useState<Partial<Record<ConnectKind, Array<{ id: string; label: string }>>>>({})
+  const [lists, setLists] = useState<Partial<Record<ConnectKind, Resource[]>>>({})
   const [notes, setNotes] = useState<Partial<Record<ConnectKind, string>>>({})
 
   useEffect(() => {
@@ -36,12 +38,7 @@ export function ConnectPanel({ project }: { project: Project }) {
     }
   }, [project.id, project.localPath])
 
-  const hinted = new Set(hints.map((item) => item.kind))
-  const bound = new Set(project.services.map((service) => service.kind))
-  const detected = KINDS.filter((kind) => hinted.has(kind) || bound.has(kind) || lists[kind])
-  const visible = showAll || detected.length === 0 ? KINDS : detected
-
-  const rows = visible.map((kind) => {
+  const rows = KINDS.map((kind) => {
     const service = project.services.find((item) => item.kind === kind)
     const hint = service?.externalId || hints.find((item) => item.kind === kind)?.id
     const link = connectionState({
@@ -49,23 +46,15 @@ export function ConnectPanel({ project }: { project: Project }) {
       externalId: service?.externalId,
       checks: service?.checks ?? [],
     })
-    const label =
-      link.state === 'conectado' ? 'Conectado' : link.state === 'error' ? 'Error' : 'Falta conectar'
-    return { kind, hint, link, label, note: notes[kind] }
+    return { kind, service, hint, link, note: notes[kind] }
   })
-  const pending = rows.filter((row) => row.label !== 'Conectado')
+  const pending = rows.some((row) => row.link.state !== 'conectado')
 
   function applyItems(items: AutoconnectItem[]) {
-    const nextLists: Partial<Record<ConnectKind, Array<{ id: string; label: string }>>> = {}
+    const nextLists: Partial<Record<ConnectKind, Resource[]>> = {}
     const nextChoices: Partial<Record<ConnectKind, string>> = {}
     const nextNotes: Partial<Record<ConnectKind, string>> = {}
     for (const item of items) {
-      if (item.hint) {
-        setHints((current) => {
-          const rest = current.filter((hint) => hint.kind !== item.kind)
-          return [...rest, { kind: item.kind, id: item.hint, evidence: item.reason ?? '' }]
-        })
-      }
       if (item.resources?.length) {
         nextLists[item.kind] = item.resources
         nextChoices[item.kind] =
@@ -73,7 +62,7 @@ export function ConnectPanel({ project }: { project: Project }) {
             ? item.hint
             : item.resources[0].id
       }
-      if (item.error || item.reason) nextNotes[item.kind] = item.error || item.reason
+      if (item.error) nextNotes[item.kind] = item.error
     }
     setLists(nextLists)
     setChoices(nextChoices)
@@ -90,10 +79,8 @@ export function ConnectPanel({ project }: { project: Project }) {
       if (Array.isArray(payload.hints)) setHints(payload.hints)
       applyItems(items)
       await reload()
-      const linked = items.filter((item) => item.state === 'enlazado' || item.state === 'conectado')
-      if (items.some((item) => item.state === 'enlazado')) {
-        pushToast(linked.length === 1 ? 'Un servicio quedó enlazado' : `${items.filter((item) => item.state === 'enlazado').length} servicios enlazados`)
-      }
+      const linked = items.filter((item) => item.state === 'enlazado')
+      if (linked.length) pushToast(linked.length === 1 ? 'Un servicio quedó enlazado' : `${linked.length} servicios enlazados`)
       const missing = items.find((item) => item.state === 'falta-cuenta')
       if (missing) setDialog(missing.kind)
     } catch (error) {
@@ -103,22 +90,22 @@ export function ConnectPanel({ project }: { project: Project }) {
     }
   }
 
-  async function confirm(kind: ConnectKind) {
-    const resourceId = choices[kind]
-    if (!resourceId) return
+  async function post(kind: ConnectKind, phase: 'save' | 'test' | 'disconnect', resourceId?: string) {
     setBusy(true)
     try {
       const response = await fetch(`/api/projects/${project.id}/connect-service`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind, phase: 'save', resourceId }),
+        body: JSON.stringify({ kind, phase, resourceId }),
       })
       const payload = await response.json()
-      if (!response.ok) throw new Error(payload.error ?? 'No se pudo confirmar')
+      if (!response.ok) throw new Error(payload.error ?? 'No se pudo completar')
       await reload()
-      pushToast(`${TOKEN_GUIDES[kind].label} confirmado`)
+      if (phase === 'test') pushToast('Chequeo listo')
+      else if (phase === 'disconnect') pushToast('Servicio desconectado')
+      else pushToast(`${TOKEN_GUIDES[kind].label} confirmado`)
     } catch (error) {
-      pushToast(error instanceof Error ? error.message : 'No se pudo confirmar', 'warn')
+      pushToast(error instanceof Error ? error.message : 'No se pudo completar', 'warn')
     } finally {
       setBusy(false)
     }
@@ -129,79 +116,88 @@ export function ConnectPanel({ project }: { project: Project }) {
       <div className="section-head">
         <div>
           <h2>Servicios</h2>
-          <p>La cuenta se conecta una vez. Acá solo confirmás el recurso de este proyecto.</p>
+          <p>La cuenta se conecta una vez. Acá confirmás el recurso.</p>
         </div>
-        {pending.length > 0 && (
-          <button type="button" className="primary-button" disabled={busy} onClick={() => void autoconnect()}>
+        {pending && (
+          <Button variant="primary" disabled={busy} onClick={() => void autoconnect()}>
             {busy ? 'Enlazando…' : 'Conectar todo'}
-          </button>
+          </Button>
         )}
       </div>
-      <div className="stack">
+      <div className="svc-grid">
         {rows.map((row) => {
           const options = lists[row.kind]
+          const hasAccount = Boolean(credentials.integrations[row.kind])
           const primary =
-            row.label === 'Conectado' ? null : !credentials.integrations[row.kind] ? 'cuenta' : 'confirmar'
+            row.link.state === 'conectado'
+              ? undefined
+              : row.link.state === 'error'
+                ? 'Reintentar'
+                : !hasAccount
+                  ? 'Conectar'
+                  : options && options.length > 1
+                    ? 'Confirmar'
+                    : 'Usar detectado'
+          const badge = row.link.state === 'conectado' ? 'Conectado' : row.link.state === 'error' ? 'Error' : 'Falta conectar'
           return (
-            <article key={row.kind} className="quiet-row">
-              <span
-                className={`status-dot dot-${row.link.state === 'conectado' ? 'healthy' : row.link.state === 'error' ? 'down' : 'unknown'}`}
-              />
-              <div className="quiet-copy">
-                <strong>{TOKEN_GUIDES[row.kind].label}</strong>
-                <span>
-                  {row.label === 'Conectado' && <Check size={14} aria-hidden="true" />} {row.label}
-                  {row.hint ? ` · ${row.hint}` : ''}
-                </span>
-                {row.label === 'Error' && <span className="form-error">{row.note || row.link.detail}</span>}
-                {row.label !== 'Error' && row.note && row.label !== 'Conectado' && (
-                  <span>{row.note}</span>
-                )}
-              </div>
-              {options && options.length > 1 && (
-                <select
-                  aria-label={`Recurso de ${TOKEN_GUIDES[row.kind].label}`}
-                  value={choices[row.kind] ?? ''}
-                  onChange={(event) => setChoices((current) => ({ ...current, [row.kind]: event.target.value }))}
-                >
-                  {options.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {primary === 'cuenta' && (
-                <button type="button" className="ghost-button" onClick={() => setDialog(row.kind)}>
-                  Conectar cuenta
-                </button>
-              )}
-              {primary === 'confirmar' && (
-                <button
-                  type="button"
-                  className="ghost-button"
-                  disabled={busy || (options ? !choices[row.kind] : false)}
-                  onClick={() => (options?.length ? void confirm(row.kind) : void autoconnect())}
-                >
-                  {options?.length ? 'Confirmar' : 'Usar detectado'}
-                </button>
-              )}
-            </article>
+            <ServiceCard
+              key={row.kind}
+              title={TOKEN_GUIDES[row.kind].label}
+              hint={row.hint}
+              tone={toneForLink(row.link.state)}
+              badge={badge}
+              detail={row.link.state === 'error' ? row.note || row.link.detail : undefined}
+              primaryLabel={primary}
+              primaryDisabled={busy || (primary === 'Confirmar' && !choices[row.kind])}
+              onPrimary={
+                primary
+                  ? () => {
+                      if (row.link.state === 'error') void post(row.kind, 'test')
+                      else if (!hasAccount) setDialog(row.kind)
+                      else if (options && options.length > 1) void post(row.kind, 'save', choices[row.kind])
+                      else void autoconnect()
+                    }
+                  : undefined
+              }
+              extra={
+                options && options.length > 1 ? (
+                  <select
+                    className="svc-select"
+                    aria-label={`Recurso de ${TOKEN_GUIDES[row.kind].label}`}
+                    value={choices[row.kind] ?? ''}
+                    onChange={(event) => setChoices((current) => ({ ...current, [row.kind]: event.target.value }))}
+                  >
+                    {options.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : null
+              }
+              menu={[
+                {
+                  label: 'Probar',
+                  disabled: busy,
+                  onSelect: () => void post(row.kind, 'test'),
+                },
+                {
+                  label: 'Desconectar',
+                  disabled: busy || !row.service?.externalId,
+                  onSelect: () => void post(row.kind, 'disconnect'),
+                },
+              ]}
+            />
           )
         })}
       </div>
-      <div className="quiet-actions">
-        {detected.length > 0 && detected.length < KINDS.length && (
-          <button type="button" className="text-button" onClick={() => setShowAll((value) => !value)}>
-            {showAll ? 'Ocultar otros servicios' : 'Ver otros servicios'}
-          </button>
-        )}
-        {pending.length === 0 && (
-          <button type="button" className="ghost-button" onClick={() => void refresh(project.id)}>
+      {!pending && (
+        <div className="quiet-actions">
+          <Button variant="ghost" disabled={busy} onClick={() => void refresh(project.id)}>
             Chequear ahora
-          </button>
-        )}
-      </div>
+          </Button>
+        </div>
+      )}
       {dialog && (
         <AccountDialog
           kind={dialog}

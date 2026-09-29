@@ -179,8 +179,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}))
-      if (payload.code === 'corrupt-workspace' || payload.code === 'corrupt-credentials') {
-        setRecoverTarget(payload.code === 'corrupt-credentials' ? 'credentials' : 'workspace')
+      if (payload.code === 'corrupt-workspace' || payload.code === 'corrupt-credentials' || payload.code === 'vault-key') {
+        setRecoverTarget(payload.code === 'corrupt-workspace' ? 'workspace' : 'credentials')
         setGate('recover')
       }
       throw new Error(payload.error ?? 'No se pudo leer el workspace')
@@ -217,7 +217,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         const session = await fetch('/api/session', { cache: 'no-store' })
         const payload = await session.json()
         if (cancelled) return
-        if (payload.corrupt === 'credentials') {
+        if (payload.corrupt) {
+          if (payload.error) pushToast(payload.error, 'warn')
           setRecoverTarget('credentials')
           setGate('recover')
           setReady(true)

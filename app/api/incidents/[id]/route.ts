@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { appendAudit } from '@/lib/audit'
 import { denyIfLocked } from '@/lib/guard'
+import { allowRate } from '@/lib/rate-limit'
 import { incidentPatchSchema } from '@/lib/schemas'
 import { loadWorkspace, saveWorkspace } from '@/lib/store'
 import { workspaceResponse } from '@/lib/workspace-response'
@@ -10,6 +11,9 @@ export const runtime = 'nodejs'
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const denied = denyIfLocked(request)
   if (denied) return denied
+  if (!allowRate('incident.patch', 40, 60_000)) {
+    return NextResponse.json({ error: 'Demasiados intentos. Esperá un minuto.' }, { status: 429 })
+  }
   const { id } = await params
   const parsed = incidentPatchSchema.safeParse(await request.json().catch(() => ({})))
   if (!parsed.success) {

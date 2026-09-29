@@ -71,7 +71,31 @@ export type TokenValidation =
   | { ok: true; account: string; resources: ServiceResource[]; teamId?: string }
   | { ok: false; error: string }
 
+export function providerMocksEnabled() {
+  return process.env.SUITE_MOCK_PROVIDERS === '1'
+}
+
+export function mockResources(kind: ConnectKind): ServiceResource[] {
+  const id =
+    kind === 'github'
+      ? 'acme/web'
+      : kind === 'supabase'
+        ? 'abcdefghijklmnop'
+        : kind === 'cloudflare'
+          ? 'acme.test'
+          : kind === 'sentry'
+            ? 'acme/web'
+            : 'web'
+  return [{ id, label: id }]
+}
+
 export async function validateServiceToken(kind: ConnectKind, token: string): Promise<TokenValidation> {
+  if (providerMocksEnabled()) {
+    if (/invalid|malo/i.test(token)) {
+      return { ok: false, error: 'El token de prueba fue rechazado. Falta permiso de lectura.' }
+    }
+    return { ok: true, account: 'acme', resources: mockResources(kind), teamId: kind === 'vercel' ? 'team_demo' : undefined }
+  }
   try {
     if (kind === 'vercel') {
       const result = await validateVercelToken(token)

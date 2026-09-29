@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
+import { closeSync, copyFileSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync, writeSync } from 'node:fs'
 import { dirname } from 'node:path'
 
 export function writeJsonFile(path: string, value: unknown) {
@@ -6,7 +6,13 @@ export function writeJsonFile(path: string, value: unknown) {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
   const tmp = `${path}.${process.pid}.tmp`
   const payload = JSON.stringify(value, null, 2)
-  writeFileSync(tmp, payload, 'utf8')
+  const fd = openSync(tmp, 'w')
+  try {
+    writeSync(fd, payload)
+    fsyncSync(fd)
+  } finally {
+    closeSync(fd)
+  }
   try {
     renameSync(tmp, path)
   } catch {

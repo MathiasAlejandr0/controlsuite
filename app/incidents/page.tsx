@@ -1,6 +1,7 @@
 'use client'
 
 import { IncidentCard } from '@/components/incident-card'
+import { EmptyState } from '@/components/ui/empty-state'
 import { sortAlerts } from '@/lib/alerts'
 import { useWorkspace } from '@/lib/workspace'
 
@@ -18,7 +19,7 @@ export default function IncidentsPage() {
         </div>
       </section>
 
-      {open.length === 0 && <p className="quiet-empty">Nada que resolver.</p>}
+      {open.length === 0 && <EmptyState>Nada que resolver.</EmptyState>}
       <div className="stack">
         {open.map((incident) => (
           <IncidentCard

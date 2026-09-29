@@ -7,6 +7,7 @@ import { sortAlerts } from '@/lib/alerts'
 import { projectStatus, sortByRisk } from '@/lib/health'
 import { useWorkspace } from '@/lib/workspace'
 import { ProjectForm } from '@/components/project-form'
+import { EmptyState } from '@/components/ui/empty-state'
 
 export default function OverviewPage() {
   const { query, projects, incidents, ready } = useWorkspace()
@@ -60,7 +61,7 @@ export default function OverviewPage() {
           )}
         </div>
         {actionable.length === 0 ? (
-          <p className="quiet-empty">Nada pendiente.</p>
+          <EmptyState>Nada pendiente.</EmptyState>
         ) : (
           <div className="stack">
             {actionable.slice(0, 5).map((incident) => {
@@ -88,8 +89,8 @@ export default function OverviewPage() {
             Ver lista
           </Link>
         </div>
-        {projects.length === 0 && <p className="quiet-empty">Todavía no hay proyectos.</p>}
-        {projects.length > 0 && visible.length === 0 && <p className="quiet-empty">Nada coincide con la búsqueda.</p>}
+        {projects.length === 0 && <EmptyState>Todavía no hay proyectos.</EmptyState>}
+        {projects.length > 0 && visible.length === 0 && <EmptyState>Nada coincide con la búsqueda.</EmptyState>}
         <div className="stack">
           {visible.slice(0, 8).map((project) => (
             <Link key={project.id} href={`/projects/${project.id}`} className="quiet-row">

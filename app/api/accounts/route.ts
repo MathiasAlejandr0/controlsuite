@@ -5,7 +5,7 @@ import { githubAccessToken } from '@/lib/github-access'
 import { withLock } from '@/lib/lock'
 import { allowRate } from '@/lib/rate-limit'
 import { serviceConnectSchema } from '@/lib/schemas'
-import { validateServiceToken, type ConnectKind } from '@/lib/service-link'
+import { mockResources, providerMocksEnabled, validateServiceToken, type ConnectKind } from '@/lib/service-link'
 import { listCloudflareZones } from '@/lib/connectors/cloudflare'
 import { fetchInstallationRepos, listGithubRepos } from '@/lib/connectors/github'
 import { listSentryProjects } from '@/lib/connectors/sentry'
@@ -16,6 +16,7 @@ import { appendAudit } from '@/lib/audit'
 export const runtime = 'nodejs'
 
 async function listFor(kind: ConnectKind, token: string, teamId?: string) {
+  if (providerMocksEnabled()) return mockResources(kind)
   if (kind === 'github') {
     const repos = await listGithubRepos(token)
     if (repos.length > 0) return repos

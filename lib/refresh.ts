@@ -183,6 +183,15 @@ export async function refreshWorkspace(
   projectIds?: string | string[],
   options?: { mode?: RefreshMode; reconcile?: boolean },
 ): Promise<WorkspaceData> {
+  if (process.env.SUITE_MOCK_PROVIDERS === '1') {
+    return withLock(() => {
+      const latest = loadWorkspace()
+      latest.lastSyncedAt = new Date().toISOString()
+      latest.incidents = mergeIncidents(latest.incidents, detectedIncidents(latest.projects))
+      saveWorkspace(latest)
+      return latest
+    })
+  }
   const mode = options?.mode ?? 'full'
   const snapshot = loadWorkspace()
   const wanted =

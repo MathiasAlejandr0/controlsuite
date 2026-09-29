@@ -8,7 +8,7 @@ import { loadCredentials } from './credentials'
 import { detectResourceHints, obviousMatch, type ConnectKind, type ListedResource, type ResourceHint } from './detect-resources'
 import { githubAccessToken } from './github-access'
 import { applyProjectPatch } from './project-patch'
-import { patchFieldFor } from './service-link'
+import { mockResources, patchFieldFor, providerMocksEnabled } from './service-link'
 import { loadWorkspace, saveWorkspace } from './store'
 import type { ProjectPatch } from './schemas'
 import type { Project } from './types'
@@ -56,6 +56,7 @@ export function classifyLink(input: {
 }
 
 async function resourcesFor(kind: ConnectKind, token: string, teamId?: string): Promise<ListedResource[]> {
+  if (providerMocksEnabled()) return mockResources(kind)
   if (kind === 'github') {
     const repos = await listGithubRepos(token)
     if (repos.length > 0) return repos

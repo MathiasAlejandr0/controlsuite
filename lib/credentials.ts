@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { readJsonWithBackup, writeJsonFile } from './json-file'
 import { suiteDataDir } from './paths'
 import { accessFlags, resolveLogin } from './login'
-import { decryptJson, encryptJson, isVaultEnvelope, restrictDataFile } from './protect'
+import { decryptJson, encryptJson, isVaultEnvelope, restrictDataFile, VaultKeyError } from './protect'
 import type { CredentialStatus, Credentials, IntegrationId } from './types'
 
 const dataDir = suiteDataDir()
@@ -85,7 +85,7 @@ export function loadCredentials(): Credentials {
     }
     return creds
   } catch (error) {
-    if (error instanceof CredentialsCorruptError) throw error
+    if (error instanceof CredentialsCorruptError || error instanceof VaultKeyError) throw error
     throw new CredentialsCorruptError()
   }
 }

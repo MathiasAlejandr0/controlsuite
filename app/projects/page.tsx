@@ -6,6 +6,7 @@ import { Plus } from 'lucide-react'
 import { isLiveProject, projectStatus, sortByRisk } from '@/lib/health'
 import { useWorkspace } from '@/lib/workspace'
 import { ProjectForm } from '@/components/project-form'
+import { EmptyState } from '@/components/ui/empty-state'
 
 type FilterId = 'all' | 'risk' | 'live'
 
@@ -58,7 +59,7 @@ export default function ProjectsPage() {
         ))}
       </div>
 
-      {visible.length === 0 && <p className="quiet-empty">No hay proyectos en este filtro.</p>}
+      {visible.length === 0 && <EmptyState>No hay proyectos en este filtro.</EmptyState>}
       <div className="stack">
         {visible.map((project) => (
           <div key={project.id} className="quiet-row">
